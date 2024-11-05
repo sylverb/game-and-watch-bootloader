@@ -167,7 +167,6 @@ Core/Src/FatFs/ffunicode.c \
 Core/Src/FatFs/user_diskio_spi.c \
 Core/Src/FatFs/user_diskio_softspi.c \
 Core/Src/FatFs/user_diskio.c \
-Core/Src/flash.c \
 Core/Src/lcd.c \
 Core/Src/buttons.c \
 Core/Src/main.c \
@@ -271,6 +270,7 @@ LDSCRIPT = STM32H7B0VBTx_FLASH.ld
 LIBS = -lc -lm -lnosys
 LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LDFLAGS += -Wl,--defsym=__INTFLASH__=$(INTFLASH_ADDRESS)
 
 ifeq ($(DEBUG), 1)
 else
@@ -288,10 +288,6 @@ ADAPTER ?= stlink
 reset:
 	@$(GNWMANAGER) start bank1
 .PHONY: reset
-
-start_bank_1:
-	$(GNWMANAGER) start bank1
-.PHONY: start_bank_1
 
 start:  # Start code located at INTFLASH_ADDRESS
 	$(GNWMANAGER) start $(INTFLASH_ADDRESS)

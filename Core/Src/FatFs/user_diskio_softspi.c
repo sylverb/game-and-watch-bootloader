@@ -317,7 +317,6 @@ static bool SD_PowerOn(void)
     response = send_cmd(GO_IDLE_STATE, 0);
     if (response.r0 != (1 << R1_IDLE))
     {
-        switch_ospi_gpio(true);
         return false;
     }
 
@@ -367,8 +366,6 @@ DSTATUS USER_SOFTSPI_initialize(
     /* no disk */
     if (Stat & STA_NODISK)
         return Stat;
-
-    switch_ospi_gpio(false);
 
     /* power on */
     if (!SD_PowerOn()) {
@@ -447,7 +444,6 @@ DSTATUS USER_SOFTSPI_initialize(
         /* Initialization failed */
         SD_PowerOff();
     }
-    switch_ospi_gpio(true);
 
     return Stat;
 }
@@ -489,8 +485,6 @@ DRESULT USER_SOFTSPI_read(
     /* convert to byte address */
     if (!(CardType & CT_BLOCK))
         sector *= 512;
-
-    switch_ospi_gpio(false);
 
     SELECT();
 
@@ -540,7 +534,6 @@ DRESULT USER_SOFTSPI_read(
     /* Idle */
     DESELECT();
     SD_ReadyWait();
-    switch_ospi_gpio(true);
 
     return count ? RES_ERROR : RES_OK;
 }
@@ -576,8 +569,6 @@ DRESULT USER_SOFTSPI_write(
         sector *= 512;
 
     SELECT();
-
-    switch_ospi_gpio(false);
 
     if (count == 1)
     {
@@ -632,7 +623,6 @@ DRESULT USER_SOFTSPI_write(
     /* Idle */
     DESELECT();
     SD_ReadyWait();
-    switch_ospi_gpio(true);
 
     return count ? RES_ERROR : RES_OK;
 }
@@ -684,7 +674,6 @@ DRESULT USER_SOFTSPI_ioctl(
             return RES_NOTRDY;
         }
         SELECT();
-        switch_ospi_gpio(false);
 
         switch (ctrl)
         {
@@ -696,7 +685,6 @@ DRESULT USER_SOFTSPI_ioctl(
             res = RES_ERROR;
             break;
         }
-        switch_ospi_gpio(true);
     }
     return res;
 }

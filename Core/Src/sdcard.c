@@ -49,48 +49,34 @@ void sdcard_deinit_spi1() {
 }
 
 void sdcard_init_ospi1() {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  HAL_OSPI_DeInit(&hospi1);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, GPIO_FLASH_NCS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_FLASH_MOSI_Pin|GPIO_FLASH_CLK_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : GPIO_FLASH_NCS_Pin */
+  GPIO_InitStruct.Pin = GPIO_FLASH_NCS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIO_FLASH_NCS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : GPIO_FLASH_MOSI_Pin GPIO_FLASH_CLK_Pin */
+  GPIO_InitStruct.Pin = GPIO_FLASH_MOSI_Pin|GPIO_FLASH_CLK_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : GPIO_FLASH_MISO_Pin */
+  GPIO_InitStruct.Pin = GPIO_FLASH_MISO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIO_FLASH_MISO_GPIO_Port, &GPIO_InitStruct);
 }
 
 void sdcard_deinit_ospi1() {
-}
-
-void switch_ospi_gpio(uint8_t ToOspi) {
-  static uint8_t IsOspi = true;
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  if (IsOspi == ToOspi)
-    return;
-
-  if (ToOspi) {
-    if (HAL_OSPI_Init(&hospi1) != HAL_OK)
-      Error_Handler();
-  } else {
-    HAL_OSPI_DeInit(&hospi1);
-
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOE, GPIO_FLASH_NCS_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOB, GPIO_FLASH_MOSI_Pin|GPIO_FLASH_CLK_Pin, GPIO_PIN_RESET);
-
-    /*Configure GPIO pin : GPIO_FLASH_NCS_Pin */
-    GPIO_InitStruct.Pin = GPIO_FLASH_NCS_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    HAL_GPIO_Init(GPIO_FLASH_NCS_GPIO_Port, &GPIO_InitStruct);
-
-    /*Configure GPIO pins : GPIO_FLASH_MOSI_Pin GPIO_FLASH_CLK_Pin */
-    GPIO_InitStruct.Pin = GPIO_FLASH_MOSI_Pin|GPIO_FLASH_CLK_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    /*Configure GPIO pins : GPIO_FLASH_MISO_Pin */
-    GPIO_InitStruct.Pin = GPIO_FLASH_MISO_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIO_FLASH_MISO_GPIO_Port, &GPIO_InitStruct);
-  }
-
-  IsOspi = ToOspi;
 }

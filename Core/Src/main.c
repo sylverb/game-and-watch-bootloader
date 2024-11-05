@@ -23,11 +23,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "buttons.h"
-#include "flash.h"
 #include "lcd.h"
 #include <string.h>
 #include <stdbool.h>
-#include "flash.h"
 #include "bootloader.h"
 /* USER CODE END Includes */
 
@@ -87,7 +85,6 @@ static void MX_DMA_Init(void);
 static void MX_IWDG1_Init(void);
 static void MX_LTDC_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_OCTOSPI1_Init(void);
 static void MX_HASH_Init(void);
 
 #ifdef HAL_SAI_MODULE_ENABLED
@@ -105,7 +102,6 @@ static void MX_ADC1_Init(void);
 #endif
 
 static void MX_TIM1_Init(void);
-static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -148,7 +144,6 @@ int main(void)
   MX_IWDG1_Init();
   MX_LTDC_Init();
   MX_SPI2_Init();
-  MX_OCTOSPI1_Init();
 #ifdef HAL_SAI_MODULE_ENABLED
   MX_SAI1_Init();
 #endif
@@ -163,11 +158,7 @@ int main(void)
   MX_TIM1_Init();
   MX_HASH_Init();
 
-  /* Initialize interrupts */
-  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-  //lcd_init(&hspi2, &hltdc);
-  //memset(framebuffer, 0xff, sizeof(framebuffer));
 
   lcd_deinit(&hspi2);
 
@@ -179,13 +170,20 @@ int main(void)
     HAL_Delay(50);
   }
 
+  /* Power off LCD and external Flash */
+  lcd_backlight_off();
+
   /* Power on LCD and external Flash */
   lcd_init(&hspi2, &hltdc);
 
-  lcd_backlight_on();
+  SCB_InvalidateDCache();
+  SCB_InvalidateICache();
+
+  SCB_EnableICache();
+  SCB_EnableDCache();
 
   // Setup external-flash-chip-communications
-  OSPI_Init(&hospi1);
+//  OSPI_Init(&hospi1);
 
   /* USER CODE END 2 */
 
@@ -193,14 +191,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    SCB_InvalidateICache();
-    SCB_EnableICache();
-
     bootloader_main();
   }
-    /* USER CODE END WHILE */
+  /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+  /* USER CODE BEGIN 3 */
   /* USER CODE END 3 */
 }
 
@@ -325,17 +320,6 @@ void SystemClock_Config(void)
   RCC_CRSInitStruct.HSI48CalibrationValue = 32;
 
   HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
-}
-
-/**
-  * @brief NVIC Configuration.
-  * @retval None
-  */
-static void MX_NVIC_Init(void)
-{
-  /* OCTOSPI1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(OCTOSPI1_IRQn);
 }
 
 #ifdef HAL_ADC_MODULE_ENABLED
@@ -610,57 +594,6 @@ static void MX_LTDC_Init(void)
   /* USER CODE BEGIN LTDC_Init 2 */
 
   /* USER CODE END LTDC_Init 2 */
-
-}
-
-/**
-  * @brief OCTOSPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_OCTOSPI1_Init(void)
-{
-
-  /* USER CODE BEGIN OCTOSPI1_Init 0 */
-
-  /* USER CODE END OCTOSPI1_Init 0 */
-
-  OSPIM_CfgTypeDef sOspiManagerCfg = {0};
-
-  /* USER CODE BEGIN OCTOSPI1_Init 1 */
-
-  /* USER CODE END OCTOSPI1_Init 1 */
-  /* OCTOSPI1 parameter configuration*/
-  hospi1.Instance = OCTOSPI1;
-  hospi1.Init.FifoThreshold = 4;
-  hospi1.Init.DualQuad = HAL_OSPI_DUALQUAD_DISABLE;
-  hospi1.Init.MemoryType = HAL_OSPI_MEMTYPE_MACRONIX;
-  hospi1.Init.DeviceSize = 28;
-  hospi1.Init.ChipSelectHighTime = 2;
-  hospi1.Init.FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE;
-  hospi1.Init.ClockMode = HAL_OSPI_CLOCK_MODE_0;
-  hospi1.Init.WrapSize = HAL_OSPI_WRAP_NOT_SUPPORTED;
-  hospi1.Init.ClockPrescaler = 1;
-  hospi1.Init.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE;
-  hospi1.Init.DelayHoldQuarterCycle = HAL_OSPI_DHQC_DISABLE;
-  hospi1.Init.ChipSelectBoundary = 0;
-  hospi1.Init.DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_BYPASSED;
-  hospi1.Init.MaxTran = 0;
-  hospi1.Init.Refresh = 0;
-  if (HAL_OSPI_Init(&hospi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sOspiManagerCfg.ClkPort = 1;
-  sOspiManagerCfg.NCSPort = 1;
-  sOspiManagerCfg.IOLowPort = HAL_OSPIM_IOPORT_1_LOW;
-  if (HAL_OSPIM_Config(&hospi1, &sOspiManagerCfg, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN OCTOSPI1_Init 2 */
-
-  /* USER CODE END OCTOSPI1_Init 2 */
 
 }
 

@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-#include "flash.h"
 #include "sdcard.h"
 #include "lcd.h"
 #include "main.h"
@@ -17,8 +17,6 @@
 #include "stm32h7xx_hal.h"
 
 #include "ff.h"
-
-#define BANK_2_ADDRESS 0x08100000
 
 static FATFS FatFs;  // Fatfs handle
 
@@ -89,8 +87,8 @@ static void bootloader_run(void)
     wdog_refresh();
     offset += overlay_draw_text(0, offset, GW_LCD_WIDTH, "Hello GnW", 0xFFFF, 0x0000);
 
-    uint32_t sp = *((uint32_t *)BANK_2_ADDRESS);
-    uint32_t pc = *((uint32_t *)BANK_2_ADDRESS+0x04);
+    uint32_t sp = *((uint32_t *)FLASH_BANK2_BASE);
+    uint32_t pc = *((uint32_t *)FLASH_BANK2_BASE+0x04);
 
     snprintf(msg, sizeof(msg), "Bank 2 sp: 0x%08lx PC=0x%08lx",sp,pc);
     offset += overlay_draw_text(0, offset, GW_LCD_WIDTH, msg, 0xFFFF, 0x0000);
@@ -111,6 +109,8 @@ static void bootloader_run(void)
 void bootloader_main()
 {
     sdcard_hw_detect();
+
+    lcd_backlight_on();
 
     while (true) {
         if(buttons_get() & B_POWER) {

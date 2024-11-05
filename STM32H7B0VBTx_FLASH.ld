@@ -58,6 +58,9 @@ _estack = 0x20020000;    /* end of RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
+/* Bootloader should be set at 0x08000000 or 0x08020000 */
+__INTFLASH__ = DEFINED(__INTFLASH__) ? __INTFLASH__ : 0x08000000;
+
 /* Specify the memory areas */
 MEMORY
 {
@@ -65,7 +68,7 @@ MEMORY
   DTCMRAM  (xrw) : ORIGIN = 0x20000000, LENGTH = 128K
   RAM      (xrw) : ORIGIN = 0x24000000, LENGTH = 1024K
   AHBRAM   (xrw) : ORIGIN = 0x30000000, LENGTH = 128K
-  FLASH    (xr ) : ORIGIN = 0x08000000, LENGTH = 128K
+  FLASH    (xr ) : ORIGIN = __INTFLASH__, LENGTH = 128K
 }
 REGION_ALIAS("FIRMWARE_LOCATION", FLASH)
 REGION_ALIAS("REGION_ISR", FIRMWARE_LOCATION);
