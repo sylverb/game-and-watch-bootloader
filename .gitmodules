@@ -1,0 +1,3 @@
+[submodule "Core/Src/porting/lib/FatFs"]
+	path = Core/Src/porting/lib/FatFs
+	url = https://github.com/sylverb/FatFs.git

@@ -1,0 +1,694 @@
+SHELL := /bin/bash
+
+######################################
+# building variables
+######################################
+# debug build?
+DEBUG ?= 1
+# optimization
+OPT ?= -Og
+
+SINGLE_FONT ?= 0
+
+OFF_SAVESTATE = 0
+ifeq ($(SHARED_HIBERNATE_SAVESTATE),1)
+	OFF_SAVESTATE = 1
+endif
+
+# Disable system logos splash screen at startup
+DISABLE_SPLASH_SCREEN ?= 0
+
+# Default NES emulator is fceumm
+FORCE_NOFRENDO ?= 0 
+NOFRENDO_PARAM := --nofrendo=$(FORCE_NOFRENDO)
+
+# Default GB emulator is tgb-dual
+FORCE_GNUBOY ?= 0 
+GNUBOY_PARAM := --gnuboy=$(FORCE_GNUBOY)
+
+# Configure INTFLASH_BANK and INTFLASH_ADDRESS
+ifdef INTFLASH_ADDRESS
+INTFLASH_ADDRESS_DECIMAL = $(shell printf "%d" $(INTFLASH_ADDRESS))
+ifdef INTFLASH_BANK
+# defined INTFLASH_ADDRESS INTFLASH_BANK
+# Sanity check that INTFLASH_ADDRESS and INTFLASH_BANK agree
+ifeq ($(shell [ $(INTFLASH_ADDRESS_DECIMAL) -ge 134217728 -a $(INTFLASH_ADDRESS_DECIMAL) -lt 135266304 ] && echo true),true)
+# INTFLASH_ADDRESS is in range [0x08000000, 0x08100000)
+ifneq ($(INTFLASH_BANK),1)
+$(error Inconsistent INTFLASH_BANK=$(INTFLASH_BANK) and INTFLASH_ADDRESS=$(INTFLASH_ADDRESS))
+endif
+else
+ifneq ($(INTFLASH_BANK),2)
+$(error Inconsistent INTFLASH_BANK=$(INTFLASH_BANK) and INTFLASH_ADDRESS=$(INTFLASH_ADDRESS))
+endif
+endif
+else  # ifdef INTFLASH_BANK
+# defined INTFLASH_ADDRESS; not defined INTFLASH_BANK
+# Derive flashbank from INTFLASH_ADDRESS
+ifeq ($(shell [ $(INTFLASH_ADDRESS_DECIMAL) -ge 134217728 -a $(INTFLASH_ADDRESS_DECIMAL) -lt 135266304 ] && echo true),true)
+# INTFLASH_ADDRESS is in range [0x08000000, 0x08100000)
+INTFLASH_BANK = 1
+else
+INTFLASH_BANK = 2
+endif
+endif
+else # ifdef INTFLASH_ADDRESS
+ifdef INTFLASH_BANK
+# not defined INTFLASH_ADDRESS; defined INTFLASH_BANK
+ifeq ($(INTFLASH_BANK),1)
+INTFLASH_ADDRESS = 0x08000000
+else
+INTFLASH_ADDRESS = 0x08100000
+endif
+else  # ifdef INTFLASH_BANK
+# not defined INTFLASH_ADDRESS INTFLASH_BANK
+INTFLASH_ADDRESS = 0x08000000
+INTFLASH_BANK = 1
+endif
+endif
+
+GNWMANAGER = gnwmanager
+
+ENABLE_SCREENSHOT ?= 1
+# Set to 1 to add game genie support
+CHEAT_CODES ?= 0
+ifeq ($(GAME_GENIE),1)
+	CHEAT_CODES = 1
+endif
+
+# Compress supported ROMs by default. Set to 0 to disable.
+COMPRESS ?= lzma
+ifeq ($(COMPRESS),0)
+	COMPRESS_PARAM :=
+else
+	COMPRESS_PARAM := --compress=$(COMPRESS)
+endif
+
+# Reset the DBGMCU configuration register (DBGMCU_CR) after flashing
+# Set to 0 to keep the clocks running when suspended (makes debugging easier)
+RESET_DBGMCU ?= 1
+ifeq ($(RESET_DBGMCU),1)
+	RESET_DBGMCU_CMD = -- disable-debug
+else
+	RESET_DBGMCU_CMD =
+endif
+
+PYTHON3 ?= /usr/bin/env python3
+
+#######################################
+# paths
+#######################################
+# Build path
+BUILD_DIR ?= build
+
+#######################################
+# i18n Codepage
+#######################################
+CODEPAGE ?= 1252
+
+ES_ES ?= 1
+PT_PT ?= 1
+FR_FR ?= 1
+IT_IT ?= 1
+RU_RU ?= 1
+DE_DE ?= 1
+ZH_CN ?= 0
+ZH_TW ?= 0
+KO_KR ?= 0
+JA_JP ?= 0
+
+SCODEPAGE = "ascii"
+
+ifeq ($(CODEPAGE), 936)
+	SCODEPAGE = "gbk"
+	ZH_CN = 1
+else ifeq ($(CODEPAGE), 950)
+	SCODEPAGE = "big5"
+	ZH_TW = 1
+else ifeq ($(CODEPAGE), 932)
+	SCODEPAGE = "eucjp"
+	JA_JP = 1
+else ifeq ($(CODEPAGE), 949)
+	KO_KR = 1
+	SCODEPAGE = "euckr"
+else ifeq ($(CODEPAGE), 12511)
+	RU_RU = 1
+	SCODEPAGE = "windows-1251"
+else ifeq ($(CODEPAGE), 12521)
+	ES_ES = 1
+	SCODEPAGE = "iso-8859-1"
+else ifeq ($(CODEPAGE), 12522)
+	PT_PT = 1
+	SCODEPAGE = "iso-8859-1"
+else ifeq ($(CODEPAGE), 12523)
+	FR_FR = 1
+	SCODEPAGE = "iso-8859-1"
+else ifeq ($(CODEPAGE), 12524)
+	IT_IT = 1
+	SCODEPAGE = "iso-8859-1"
+else ifeq ($(CODEPAGE), 12521)
+	RU_RU = 1
+	SCODEPAGE = "iso-8859-5"
+else ifeq ($(CODEPAGE), 12525)
+	DE_DE = 1
+	SCODEPAGE = "iso-8859-1"
+else
+    SCODEPAGE = "iso-8859-1"
+endif
+
+UICODEPAGE ?= CODEPAGE
+ifeq ($(UICODEPAGE), 936)
+	ZH_CN = 1
+else ifeq ($(UICODEPAGE), 950)
+	ZH_TW = 1
+else ifeq ($(UICODEPAGE), 932)
+	JA_JP = 1
+else ifeq ($(UICODEPAGE), 949)
+	KO_KR = 1
+else ifeq ($(UICODEPAGE), 12521)
+	ES_ES = 1
+else ifeq ($(UICODEPAGE), 12522)
+	PT_PT = 1
+else ifeq ($(UICODEPAGE), 12523)
+	FR_FR = 1
+else ifeq ($(UICODEPAGE), 12524)
+	IT_IT = 1
+else ifeq ($(UICODEPAGE), 12521)
+	RU_RU = 1
+else ifeq ($(UICODEPAGE), 12525)
+	DE_DE = 1
+endif
+
+ROMINFOCODE ?= $(SCODEPAGE)
+CODEPAGE_PARAM := --codepage=$(ROMINFOCODE)
+
+# Version and URL for the STM32CubeH7 SDK
+SDK_VERSION ?= v1.11.1
+SDK_URL ?= https://raw.githubusercontent.com/STMicroelectronics/STM32CubeH7
+
+# Local path for the SDK
+SDK_DIR ?= Drivers
+
+# Patch file marker
+PATCH_MARKER = $(SDK_DIR)/.patched
+
+# SDK C sources
+SDK_C_SOURCES =  \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dac_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dac.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma2d.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hash.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hash_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_jpeg.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_ltdc_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_ltdc.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_ospi.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rtc_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rtc.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_sai_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_sai.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_wwdg.c \
+Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c \
+
+
+# SDK ASM sources
+SDK_ASM_SOURCES =  \
+Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/gcc/startup_stm32h7b0xx.s \
+Core/Src/memcpy-armv7m.s
+
+# SDK headers
+SDK_HEADERS = \
+Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7b0xx.h \
+Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h \
+Drivers/CMSIS/Device/ST/STM32H7xx/Include/system_stm32h7xx.h \
+Drivers/CMSIS/Include/cmsis_compiler.h \
+Drivers/CMSIS/Include/cmsis_gcc.h \
+Drivers/CMSIS/Include/cmsis_version.h \
+Drivers/CMSIS/Include/core_cm7.h \
+Drivers/CMSIS/Include/mpu_armv7.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_adc.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_adc.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_adc_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_cortex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dac_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dac.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_def.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dma_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dma.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dma2d.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_exti.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_flash_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_flash.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hash.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hash_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hsem.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_jpeg.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ltdc_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ltdc.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_mdma.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ospi.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rtc_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rtc.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_sai_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_sai.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_wwdg.h \
+Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h \
+
+
+#######################################
+# binaries
+#######################################
+PREFIX = arm-none-eabi-
+# The gcc compiler bin path can be either defined in make command via GCC_PATH variable (> make GCC_PATH=xxx)
+# either it can be added to the PATH environment variable.
+ifdef GCC_PATH
+CC   = $(GCC_PATH)/$(PREFIX)gcc
+CXX  = $(GCC_PATH)/$(PREFIX)g++
+AS   = $(GCC_PATH)/$(PREFIX)gcc -x assembler-with-cpp
+CP   = $(GCC_PATH)/$(PREFIX)objcopy
+SZ   = $(GCC_PATH)/$(PREFIX)size
+GDB  = $(GCC_PATH)/$(PREFIX)gdb
+DUMP = $(GCC_PATH)/$(PREFIX)objdump
+else
+CC   = $(PREFIX)gcc
+CXX  = $(PREFIX)g++
+AS   = $(PREFIX)gcc -x assembler-with-cpp
+CP   = $(PREFIX)objcopy
+SZ   = $(PREFIX)size
+GDB  = $(PREFIX)gdb
+DUMP = $(PREFIX)objdump
+endif
+
+HEX   = $(CP) -O ihex
+BIN   = $(CP) -O binary -S
+ECHO  = echo
+TOUCH = touch
+
+#######################################
+# CFLAGS
+#######################################
+# cpu
+CPU = -mcpu=cortex-m7 -mtune=cortex-m7
+
+# fpu
+FPU = -mfpu=fpv5-d16
+
+# float-abi
+FLOAT-ABI = -mfloat-abi=hard
+
+# mcu
+MCU = $(CPU) -mthumb -mno-unaligned-access $(FPU) $(FLOAT-ABI)
+
+# macros for gcc
+# AS defines
+AS_DEFS +=
+
+# C defines
+C_DEFS +=  \
+-D_GNU_SOURCE \
+-DINTFLASH_BANK=$(INTFLASH_BANK) \
+-DINTFLASH_ADDRESS=$(INTFLASH_ADDRESS) \
+-DBIG_BANK=$(BIG_BANK) \
+-DOFF_SAVESTATE=$(OFF_SAVESTATE) \
+-DCODEPAGE=$(CODEPAGE) \
+-DUICODEPAGE=$(UICODEPAGE) \
+-DINCLUDED_ES_ES=$(ES_ES) \
+-DINCLUDED_PT_PT=$(PT_PT) \
+-DINCLUDED_FR_FR=$(FR_FR) \
+-DINCLUDED_IT_IT=$(IT_IT) \
+-DINCLUDED_DE_DE=$(DE_DE) \
+-DINCLUDED_RU_RU=$(RU_RU) \
+-DINCLUDED_ZH_CN=$(ZH_CN) \
+-DINCLUDED_ZH_TW=$(ZH_TW) \
+-DINCLUDED_KO_KR=$(KO_KR) \
+-DINCLUDED_JA_JP=$(JA_JP) \
+-DSINGLE_FONT=$(SINGLE_FONT) \
+-DLANG=$(LANG) \
+-DUSE_HAL_DRIVER \
+-DSTM32H7B0xx \
+-DIS_LITTLE_ENDIAN \
+
+# AS includes
+AS_INCLUDES +=
+
+# C includes
+C_INCLUDES +=  \
+-ICore/Inc \
+-ICore/Inc/porting \
+-ICore/Inc/retro-go \
+-IDrivers/STM32H7xx_HAL_Driver/Inc \
+-IDrivers/STM32H7xx_HAL_Driver/Inc/Legacy \
+-IDrivers/CMSIS/Device/ST/STM32H7xx/Include \
+-IDrivers/CMSIS/Include \
+-Iretro-go-stm32/components/lupng \
+
+CXX_INCLUDES += \
+
+CFLAGS += $(CFLAGS_EXTRA)
+
+# compile gcc flags
+ASFLAGS += $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
+
+CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections -falign-functions -falign-jumps -fmerge-all-constants
+
+ifeq ($(DEBUG), 1)
+CFLAGS += -ggdb -gdwarf-2
+endif
+
+CFLAGS += -fstack-usage -Wstack-usage=20480
+
+# Generate dependency information
+CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
+
+CXXFLAGS = $(CFLAGS) $(CXX_INCLUDES) \
+-fno-rtti \
+-fno-math-errno \
+-fomit-frame-pointer \
+-fno-stack-protector \
+-fno-threadsafe-statics \
+-nostartfiles \
+-DHAVE_STDINT_H \
+-Wno-error=format-truncation
+
+LDFLAGS += -Wl,--defsym=__INTFLASH__=$(INTFLASH_ADDRESS)
+
+ifeq ($(BIG_BANK), 1)
+	FLASH_LENGTH = 256k
+else
+	FLASH_LENGTH = 128k
+endif
+
+LDFLAGS += -Wl,--defsym=__FLASH_LENGTH__=$(FLASH_LENGTH)
+
+#######################################
+# LDFLAGS
+#######################################
+# link script
+LDSCRIPT ?= STM32H7B0VBTx_SDCARD.ld
+
+# libraries
+LIBS = -lc -lm -lnosys
+CXXLIBS = -lstdc++
+LIBDIR +=
+LDFLAGS += $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) $(CXXLIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LDFLAGS += -Wl,--wrap=fflush
+
+# default action: build all
+all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET)_intflash.bin $(BUILD_DIR)/$(TARGET)_intflash2.bin
+
+#######################################
+# build the application
+#######################################
+# list of objects
+OBJECTS = $(addprefix $(BUILD_DIR)/core/,$(notdir $(C_SOURCES:.c=.o) $(SDK_C_SOURCES:.c=.o)))
+FATFS_OBJECTS = $(addprefix $(BUILD_DIR)/fatfs/,$(notdir $(FATFS_C_SOURCES:.c=.o)))
+
+vpath %.c $(sort $(dir $(C_SOURCES) $(FATFS_C_SOURCES) $(SDK_C_SOURCES)))
+
+# CXX
+CXX_OBJECTS =          $(addprefix $(BUILD_DIR)/core/,$(notdir $(CXX_SOURCES:.cpp=.o) ))
+TGBDUAL_CXX_OBJECTS = $(addprefix $(BUILD_DIR)/tgbdual/,$(notdir $(TGBDUAL_CXX_SOURCES:.cpp=.o)))
+A2600_CXX_OBJECTS = $(addprefix $(BUILD_DIR)/a2600/,$(notdir $(A2600_CXX_SOURCES:.cxx=.o)))
+
+vpath %.cpp $(sort $(dir $(CXX_SOURCES) $(TGBDUAL_CXX_SOURCES) ))
+vpath %.cxx $(sort $(dir $(A2600_CXX_SOURCES) ))
+
+# list of ASM program objects
+OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(SDK_ASM_SOURCES:.s=.o)))
+vpath %.s $(sort $(dir $(SDK_ASM_SOURCES)))
+
+# function used to generate prerequisite rules for SDK objects
+define sdk_obj_prereq_gen
+$(BUILD_DIR)/$(patsubst %.c,%.o,$(patsubst %.s,%.o,$(notdir $1))): $1
+
+endef
+# note: the blank line above is intentional
+
+# generate all object prerequisite rules
+$(eval $(foreach obj,$(SDK_C_SOURCES) $(SDK_ASM_SOURCES),$(call sdk_obj_prereq_gen,$(obj))))
+
+FORCE:
+
+Core/Inc/githash.h: FORCE | $(BUILD_DIR)
+	$(V)./scripts/update_githash.sh $@
+
+$(BUILD_DIR)/core/error_screens.o: Core/Inc/githash.h
+$(BUILD_DIR)/core/filesystem.o: Core/Inc/githash.h
+$(BUILD_DIR)/core/main.o: Core/Inc/githash.h
+$(BUILD_DIR)/core/rg_main.o: Core/Inc/githash.h
+$(BUILD_DIR)/core/gw_sdcard.o: Core/Inc/githash.h
+
+# Run parse_roms.py to generate information about the roms
+$(BUILD_DIR)/rom_files.txt: FORCE | $(BUILD_DIR)
+	$(V)$(ECHO) [ BASH ] Checking for updated roms
+
+$(BUILD_DIR)/%.o: %.s Makefile.common Makefile | $(BUILD_DIR)
+	$(V)$(ECHO) [ AS ] $(notdir $<)
+	$(V)$(AS) -c $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(FATFS_OBJECTS) Makefile.common Makefile $(LDSCRIPT)
+	$(V)$(ECHO) [ LD ] $(notdir $@)
+	$(V)$(CC) $(OBJECTS) $(FATFS_OBJECTS) $(LDFLAGS) -o $@
+
+$(BUILD_DIR)/core/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) $(PATCH_MARKER) | $(BUILD_DIR)
+	$(V)$(ECHO) [ CC core ] $(notdir $<)
+	$(V)$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/core/$(notdir $(<:.c=.lst)) $< -o $@
+
+$(BUILD_DIR)/fatfs/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) $(PATCH_MARKER) | $(BUILD_DIR)
+	$(V)$(ECHO) [ CC FatFs ] $(notdir $<)
+	$(V)$(CC) -c $(CFLAGS) $(FATFS_C_INCLUDES) -Wa,-a,-ad,-alms=$(BUILD_DIR)/fatfs/$(notdir $(<:.c=.lst)) $< -o $@
+
+$(BUILD_DIR):
+	$(V)mkdir $@
+	$(V)mkdir $@/core
+	$(V)mkdir $@/fatfs
+
+#######################################
+# Flashing
+#######################################
+
+ADAPTER ?= stlink
+
+reset:
+	@$(GNWMANAGER) start bank1
+.PHONY: reset
+
+erase_intflash_1:
+	@$(GNWMANAGER) erase bank1
+.PHONY: erase_intflash_1
+
+erase_intflash_2:
+	@$(GNWMANAGER) erase bank2
+.PHONY: erase_intflash_2
+
+erase_all:
+	@echo "Erasing Internal & External Flash..."
+	@$(GNWMANAGER) erase all
+	@echo "Erasing Complete!"
+.PHONY: erase_all
+
+start_bank_1:
+	$(GNWMANAGER) start bank1
+.PHONY: start_bank_1
+
+start_bank_2:
+	$(GNWMANAGER) start bank2
+.PHONY: start_bank_2
+
+start:  # Start code located at INTFLASH_ADDRESS
+	$(GNWMANAGER) start $(INTFLASH_ADDRESS)
+.PHONY: start
+
+
+flash_intflash: $(BUILD_DIR)/$(TARGET)_intflash.bin
+	$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $< -- start $(INTFLASH_ADDRESS)
+.PHONY: flash_intflash
+
+
+# Programs both the external and internal flash.
+flash: $(BUILD_DIR)/$(TARGET)_intflash.bin
+	@$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $(BUILD_DIR)/$(TARGET)_intflash.bin \
+		-- start $(INTFLASH_ADDRESS) \
+		$(RESET_DBGMCU_CMD)
+.PHONY: flash
+
+monitor:
+	@$(GNWMANAGER) monitor
+.PHONY: monitor
+
+flash-monitor: flash
+	$(V)$(MAKE) monitor
+.PHONY: flash-monitor
+
+# Alias for flash
+flash_all: flash
+
+size: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET)_intflash.bin 
+	$(V)printf "Internal Flash Usage (for developers): $(shell cat $(BUILD_DIR)/$(TARGET)_intflash.bin | wc -c) B\n"
+	$(V)./scripts/size.sh $<
+.PHONY: size
+
+gdb: $(BUILD_DIR)/$(TARGET).elf
+	$(GDB) $< -ex "target extended-remote :3333"
+.PHONY: gdb
+
+# Flashes intflash *only* and launches gdb afterwards
+gdb_intflash: $(BUILD_DIR)/$(TARGET)_intflash.bin
+	$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $< -- start $(INTFLASH_ADDRESS) --halt -- gdb
+.PHONY: gdb_intflash
+
+dump_screenshot:
+	@$(GNWMANAGER) screenshot dump
+.PHONY: dump_screenshot
+
+docker_build:
+	$(V)docker build -f Dockerfile --platform linux/amd64 --tag kbeckmann/retro-go-builder .
+.PHONY: docker_build
+
+docker:
+	$(V)docker run --rm -it --privileged --user $(shell id -u):$(shell id -g) --platform linux/amd64 -v $(PWD):/opt/workdir -v /dev/bus/usb:/dev/bus/usb kbeckmann/retro-go-builder
+.PHONY: docker
+
+help:
+	@echo "Game and Watch Retro Go"
+	@echo ""
+	@echo "Configuration variables:"
+	@echo "  LARGE_FLASH         - Sets the external flash size to 16MB  (deprecated)"
+	@echo "  SD_CARD             - Use SD Card reader (default=0)"
+	@echo "                        set to 1 for auto detect between SD Card reader on spi1 (Design by Tim"
+	@echo "                        Schuerewegen) or on ospi1 (Design by *yota9* Vladislav Khmelevsky)"
+	@echo "  INTFLASH_BANK       - Sets the internal flash bank. Valid values {1,2} (default=1)."
+	@echo "  INTFLASH_ADDRESS    - Explicit internal flash address. If not provided, derived from INTFLASH_BANK."
+	@echo "  BIG_BANK            - Use internal flash bank as undocumented 256k.(default=1, set 0 to 128k)."
+	@echo "  COMPRESS            - Configures ROM compression, Valid values {0,lzma} (default=lzma)."
+	@echo "  RESET_DBGMCU        - Configures if DBGMCU should be reset after flashing."
+	@echo "                        Set to 0 to disable power saving (default=1)"
+	@echo "  CODEPAGE            - Sets codepage to configures default display language.(default=1252)"
+	@echo "                        set 932 as Japanese; 936 as simple Chinese; 950 as traditional Chinese;"
+	@echo "                        949 as Korean; 12511 as Russian; 12521 as Spanish; 12522 as Portuguese;"
+	@echo "                        12523 as French; 12524 as Italian; 12525 as German;"
+	@echo "  UICODEPAGE          - Sets ui display language.(default=CODEPAGE=1252 as English)"
+	@echo "  ROMINFOCODE         - Sets encoding of parse rom name, default = ascii"
+	@echo "  ES_ES,PT_PT,FR_FR,  "
+	@echo "  IT_IT,ZH_CN,ZH_TW,  "
+	@echo "  KO_KR,JA_JP,DE_DE,  "
+	@echo "  RU_RU               - Set to 1 to include or exclude some other language"
+	@echo "  SINGLE_FONT         - Set to 1 to only include a single default font."
+	@echo "                        Saves a few dozen KB of external flash."
+	@echo "  ENABLE_SCREENSHOT   - Set to 1 to enable screenshot support (default enabled)"
+	@echo "  GAME_GENIE          - Set to 1 to enable game genie support (deprecated, use CHEAT_CODES instead)"
+	@echo "  CHEAT_CODES         - Set to 1 to enable cheat codes support (default=0)"
+	@echo "  MSX_USE_BANK_2      - Set to 1 to use Internal Bank 2 for MSX performance improvements."
+	@echo "                        Retro-Go must be in Bank 1."
+	@echo "  SHARED_HIBERNATE_SAVESTATE - Set to 1 to enable a separate savestate for off/on (default=0)"
+	@echo "  DISABLE_SPLASH_SCREEN - Set to 1 to disable the slash screen animation at startup (default=0)"
+	@echo "  FORCE_NOFRENDO      - Set to 1 to force use of previous nofrendo-go emulator instead of fceumm (default=0)"
+	@echo "  FORCE_GNUBOY        - Set to 1 to force use of previous gnuboy emulator instead of tgb-dual (default=0)"
+	@echo ""
+	@echo "Current configuration:"
+	@echo "  INTFLASH_BANK=$(INTFLASH_BANK)"
+	@echo "  BIG_BANK=$(BIG_BANK)"
+	@echo "  COMPRESS=$(COMPRESS)"
+	@echo "  RESET_DBGMCU=$(RESET_DBGMCU)"
+	@echo "  ENABLE_SCREENSHOT=$(ENABLE_SCREENSHOT)"
+	@echo "  CHEAT_CODES=$(CHEAT_CODES)"
+	@echo "  MSX_USE_BANK_2=$(MSX_USE_BANK_2)"
+	@echo "  GCC_PATH=$(GCC_PATH)"
+	@echo "  PREFIX=$(PREFIX)"
+	@echo "  CODEPAGE=$(CODEPAGE)"
+	@echo "  UICODEPAGE=$(UICODEPAGE)"
+	@echo "  ROMINFOCODE=$(ROMINFOCODE)"
+	@echo "  SHARED_HIBERNATE_SAVESTATE=$(SHARED_HIBERNATE_SAVESTATE)"
+	@echo "  ES_ES=$(ES_ES)"
+	@echo "  PT_PT=$(PT_PT)"
+	@echo "  FR_FR=$(FR_FR)"
+	@echo "  IT_IT=$(IT_IT)"
+	@echo "  RU_RU=$(RU_RU)"
+	@echo "  DE_DE=$(DE_DE)"
+	@echo "  ZH_CN=$(ZH_CN)"
+	@echo "  ZH_TW=$(ZH_TW)"
+	@echo "  KO_KR=$(KO_KR)"
+	@echo "  JA_JP=$(JA_JP)"
+	@echo ""
+	@echo "Targets:"
+	@echo "  docker            - Runs a docker container using the image created by docker_build"
+	@echo "  docker_build      - Builds a docker image"
+	@echo "  dump_screenshot   - Downloads the stored screenshot."
+	@echo "  flash             - Programs the internal and external flash"
+	@echo "  flash_intflash    - Only programs the internal flash"
+	@echo "  gdb               - Starts gdb and attaches to gdbserver"
+	@echo "  gdb_intflash      - Flashes intflash and then starts gdb and attaches to gdbserver"
+	@echo "  reset_dbgmcu      - Resets the unit and turns off DBGMCU (lowers battery drain)"
+	@echo "  reset_mcu         - Resets the unit"
+	@echo "                      publish property under edit that file before make flash "
+	@echo "  size              - Prints size information for all sections"
+	@echo ""
+.PHONY: help
+
+#######################################
+# download SDK files
+#######################################
+$(SDK_DIR)/%:
+	$(V)$(ECHO) [ WGET ] $(notdir $@)
+	$(V)wget -q $(SDK_URL)/$(SDK_VERSION)/$@ -P $(dir $@)
+
+# Rule to apply the patch
+$(PATCH_MARKER):
+	$(V)$(ECHO) [ PATCH ] Applying Drivers patch
+	$(V)patch $< < tools/drivers_enable_bank2_flashing.patch
+	$(V)touch $@
+
+.PHONY: download_sdk
+download_sdk: $(SDK_HEADERS) $(SDK_C_SOURCES) $(SDK_ASM_SOURCES) $(PATCH_MARKER)
+
+#######################################
+# clean up
+#######################################
+clean:
+	$(V)$(ECHO) [ RM ] $(BUILD_DIR)
+	$(V)-rm -fR $(BUILD_DIR)
+
+distclean: clean
+	$(V)$(ECHO) [ RM ] $(SDK_DIR)
+	$(V)rm -rf $(SDK_DIR)
+
+#######################################
+# dependencies
+#######################################
+-include $(wildcard $(BUILD_DIR)/*.d)
+
+# *** EOF ***

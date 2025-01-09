@@ -1,0 +1,31 @@
+diff --git a/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7b0xx.h b/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7b0xx.h
+index d23db59..fad3ed5 100644
+--- a/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7b0xx.h
++++ b/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7b0xx.h
+@@ -2070,7 +2070,7 @@ typedef struct
+ 
+ #define FLASH_BANK1_BASE          (0x08000000UL) /*!< Base address of : (up to 128 KB) Flash Bank1 accessible over AXI                         */
+ #define FLASH_BANK2_BASE          (0x08100000UL) /*!< For legacy only , Flash bank 2 not available on STM32H7B0xx value line                   */
+-#define FLASH_END                 (0x0801FFFFUL) /*!< FLASH end address                                                                        */
++#define FLASH_END                 (0x0813FFFFUL) /*!< FLASH end address                                                                        */
+ 
+ /* Legacy define */
+ #define FLASH_BASE                FLASH_BANK1_BASE
+@@ -8880,6 +8880,7 @@ typedef struct
+ #define FLASH_BANK_SIZE                      FLASH_SIZE            /* 128 KB     */
+ #define FLASH_LATENCY_DEFAULT                FLASH_ACR_LATENCY_3WS /* FLASH Three Latency cycles */
+ #define FLASH_NB_32BITWORD_IN_FLASHWORD      4U                    /* 128 bits */
++#define DUAL_BANK
+ 
+ /*******************  Bits definition for FLASH_ACR register  **********************/
+ #define FLASH_ACR_LATENCY_Pos                (0U)
+@@ -9118,6 +9119,9 @@ typedef struct
+ #define FLASH_OPTSR_OPTCHANGEERR_Pos         (30U)
+ #define FLASH_OPTSR_OPTCHANGEERR_Msk         (0x1UL << FLASH_OPTSR_OPTCHANGEERR_Pos) /*!< 0x40000000 */
+ #define FLASH_OPTSR_OPTCHANGEERR             FLASH_OPTSR_OPTCHANGEERR_Msk            /*!< Option byte change error flag */
++#define FLASH_OPTSR_SWAP_BANK_OPT_Pos        (31U)
++#define FLASH_OPTSR_SWAP_BANK_OPT_Msk        (0x1UL << FLASH_OPTSR_SWAP_BANK_OPT_Pos) /*!< 0x80000000 */
++#define FLASH_OPTSR_SWAP_BANK_OPT            FLASH_OPTSR_SWAP_BANK_OPT_Msk            /*!< Bank swapping option status bit */
+ 
+ /*******************  Bits definition for FLASH_OPTCCR register  *******************/
+ #define FLASH_OPTCCR_CLR_OPTCHANGEERR_Pos    (30U)

@@ -1,0 +1,69 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define RG_TIMER_INIT() int64_t _rgts_ = rg_system_timer(), _rgtl_ = rg_system_timer();
+#define RG_TIMER_LAP(name)                                                                \
+    RG_LOGW("Lap %s: %dms   Total: %dms\n", #name, (int((rg_system_timer() - _rgtl_) / 1000), \
+            (int)((rg_system_timer() - _rgts_) / 1000));                                  \
+    _rgtl_ = rg_system_timer();
+
+#define RG_MIN(a, b)            \
+    ({                          \
+        __typeof__(a) _a = (a); \
+        __typeof__(b) _b = (b); \
+        _a < _b ? _a : _b;      \
+    })
+#define RG_MAX(a, b)            \
+    ({                          \
+        __typeof__(a) _a = (a); \
+        __typeof__(b) _b = (b); \
+        _a > _b ? _a : _b;      \
+    })
+#define RG_COUNT(array) (sizeof(array) / sizeof((array)[0]))
+
+#define PRINTF_BINARY_8 "%c%c%c%c%c%c%c%c"
+#define PRINTF_BINVAL_8(i)\
+    (((i) & 0x80) ? '1' : '0'), \
+    (((i) & 0x40) ? '1' : '0'), \
+    (((i) & 0x20) ? '1' : '0'), \
+    (((i) & 0x10) ? '1' : '0'), \
+    (((i) & 0x08) ? '1' : '0'), \
+    (((i) & 0x04) ? '1' : '0'), \
+    (((i) & 0x02) ? '1' : '0'), \
+    (((i) & 0x01) ? '1' : '0')
+
+#define PRINTF_BINARY_16 PRINTF_BINARY_8 " " PRINTF_BINARY_8
+#define PRINTF_BINVAL_16(i) PRINTF_BINVAL_8((i) >> 8), PRINTF_BINVAL_8(i)
+#define PRINTF_BINARY_32 PRINTF_BINARY_16 " " PRINTF_BINARY_16
+#define PRINTF_BINVAL_32(i) PRINTF_BINVAL_16((i) >> 16), PRINTF_BINVAL_16(i)
+
+typedef struct
+{
+    uint16_t capacity;
+    uint16_t length;
+    // uint32_t hash;
+    char data[];
+} rg_str_t;
+
+/**
+ * Const strings are unique strings that will be valid for the lifetime of the application.
+ * Things like const_string("abc") == const_string("abc") are guaranteed to be true
+*/
+const char *const_string(const char *str);
+
+size_t strlcpy(char *dst, const char *src, size_t size);
+size_t strlcat(char *dst, const char *src, size_t size);
+
+char *rg_strtolower(char *str);
+char *rg_strtoupper(char *str);
+const char *rg_dirname(const char *path);
+const char *rg_basename(const char *path);
+const char *rg_extension(const char *path);
+const char *rg_relpath(const char *path);
+uint32_t rg_crc32(uint32_t crc, const uint8_t *buf, size_t len);
+uint32_t rg_hash(const char *buf, size_t len);
+void *rg_alloc(size_t size, uint32_t caps);
+void rg_usleep(uint32_t us);
