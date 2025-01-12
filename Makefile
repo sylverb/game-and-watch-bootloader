@@ -28,9 +28,6 @@ Core/Src/stm32h7xx_it.c \
 Core/Src/system_stm32h7xx.c \
 Core/src/softspi.c
 
-
-#Core/Src/porting/common.c \
-
 FATFS_C_SOURCES = \
 Core/Src/porting/lib/FatFs/user_diskio.c \
 Core/Src/porting/lib/FatFs/ff.c \
@@ -42,12 +39,11 @@ Core/Src/porting/lib/FatFs/user_diskio_softspi.c
 C_INCLUDES +=  \
 -ICore/Inc \
 -ICore/Src/porting/lib \
--ICore/Src/porting/lib/lzma \
 -ICore/Src/porting/lib/FatFs \
 -Iretro-go-stm32/components/odroid \
 -I./
 
-FATFS_INCLUDES += \
+FATFS_C_INCLUDES += \
 -ICore/Src/porting/lib/FatFs
 
 include Makefile.common

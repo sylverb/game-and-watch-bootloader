@@ -439,14 +439,6 @@ FATFS_OBJECTS = $(addprefix $(BUILD_DIR)/fatfs/,$(notdir $(FATFS_C_SOURCES:.c=.o
 
 vpath %.c $(sort $(dir $(C_SOURCES) $(FATFS_C_SOURCES) $(SDK_C_SOURCES)))
 
-# CXX
-CXX_OBJECTS =          $(addprefix $(BUILD_DIR)/core/,$(notdir $(CXX_SOURCES:.cpp=.o) ))
-TGBDUAL_CXX_OBJECTS = $(addprefix $(BUILD_DIR)/tgbdual/,$(notdir $(TGBDUAL_CXX_SOURCES:.cpp=.o)))
-A2600_CXX_OBJECTS = $(addprefix $(BUILD_DIR)/a2600/,$(notdir $(A2600_CXX_SOURCES:.cxx=.o)))
-
-vpath %.cpp $(sort $(dir $(CXX_SOURCES) $(TGBDUAL_CXX_SOURCES) ))
-vpath %.cxx $(sort $(dir $(A2600_CXX_SOURCES) ))
-
 # list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(SDK_ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(SDK_ASM_SOURCES)))
@@ -471,10 +463,6 @@ $(BUILD_DIR)/core/filesystem.o: Core/Inc/githash.h
 $(BUILD_DIR)/core/main.o: Core/Inc/githash.h
 $(BUILD_DIR)/core/rg_main.o: Core/Inc/githash.h
 $(BUILD_DIR)/core/gw_sdcard.o: Core/Inc/githash.h
-
-# Run parse_roms.py to generate information about the roms
-$(BUILD_DIR)/rom_files.txt: FORCE | $(BUILD_DIR)
-	$(V)$(ECHO) [ BASH ] Checking for updated roms
 
 $(BUILD_DIR)/%.o: %.s Makefile.common Makefile | $(BUILD_DIR)
 	$(V)$(ECHO) [ AS ] $(notdir $<)
