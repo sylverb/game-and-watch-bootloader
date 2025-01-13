@@ -21,6 +21,7 @@ Core/Src/gw_timer.c \
 Core/Src/porting/gw_alloc.c \
 Core/Src/main.c \
 Core/Src/bootloader.c \
+Core/Src/tar.c \
 Core/Src/syscalls.c \
 Core/Src/bq24072.c \
 Core/Src/stm32h7xx_hal_msp.c \

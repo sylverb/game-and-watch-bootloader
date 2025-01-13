@@ -17,7 +17,9 @@
 #include "stm32h7xx_hal.h"
 
 #include "ff.h"
+#include "tar.h"
 
+#define UPDATE_ARCHIVE_FILE "/gw_fw_update.tar"
 #define INTFLASH_2_UPDATE_FILE "/update_bank2.bin"
 #define INTFLASH_2_SIZE (256 << 10) // 256KB
 #define BUFFER_SIZE 256
@@ -143,7 +145,7 @@ void boot_bank2(void)
     }
 }
 
-void update_bank2_flash()
+bool update_bank2_flash()
 {
     bool update_status = true;
     FRESULT res;
@@ -152,7 +154,7 @@ void update_bank2_flash()
     if (res != FR_OK)
     {
         printf("No update file found\n");
-        return;
+        return false;
     }
 
     uint32_t flash_address = FLASH_BANK2_BASE;
@@ -191,6 +193,7 @@ void update_bank2_flash()
     {
         printf("Flashing failed\n");
     }
+    return update_status;
 }
 
 void bootloader_main(void)
@@ -205,7 +208,44 @@ void bootloader_main(void)
     }
     else
     {
-        update_bank2_flash();
+        // Check if update archive file is present
+        // Elseway, check if update binary file is present
+        if (extract_tar(UPDATE_ARCHIVE_FILE, ""))
+        {
+            f_unlink(UPDATE_ARCHIVE_FILE);
+            if (update_bank2_flash()) {
+                printf("Firmware update done\n");
+            }
+            else
+            {
+                printf("Firmware update failed\n");
+            }
+        }
+        else
+        {
+            if (update_bank2_flash()) {
+                printf("Firmware update done\n");
+            }
+            else
+            {
+                printf("Firmware update failed\n");
+            }
+        }
+    }
+
+    // Unmount Fs and Deinit SD Card if needed
+    if (fs_mounted) {
+        f_unmount("");
+    }
+    switch (sdcard_hw_type) {
+        case SDCARD_HW_SPI1:
+            sdcard_deinit_spi1();
+        break;
+        case SDCARD_HW_OSPI1:
+            sdcard_deinit_ospi1();
+        break;
+        default:
+        break;
     }
 
     while (1)
