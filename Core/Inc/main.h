@@ -63,11 +63,23 @@ extern sdcard_hw_type_t sdcard_hw_type;
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
-// hacky
-extern RTC_HandleTypeDef hrtc;
+#ifdef HAL_ADC_MODULE_ENABLED
+extern ADC_HandleTypeDef hadc1;
+#endif
+#ifdef HAL_DAC_MODULE_ENABLED
+extern DAC_HandleTypeDef hdac1;
+extern DAC_HandleTypeDef hdac2;
+#endif
+extern LTDC_HandleTypeDef hltdc;
 extern OSPI_HandleTypeDef hospi1;
+extern RTC_HandleTypeDef hrtc;
+#ifdef HAL_SAI_MODULE_ENABLED
+extern SAI_HandleTypeDef hsai_BlockA1;
+extern DMA_HandleTypeDef hdma_sai1_a;
+#endif
 extern SPI_HandleTypeDef hspi1;
+extern SPI_HandleTypeDef hspi2;
+extern TIM_HandleTypeDef htim1;
 
 /* USER CODE END EC */
 

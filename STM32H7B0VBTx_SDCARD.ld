@@ -64,19 +64,12 @@ _Min_Stack_Size = 20 * 1024; /* required amount of stack */
 /* Useful for scripts */
 __ITCMRAM_LENGTH__  = 64K;
 __DTCMRAM_LENGTH__  = 128K;
-__RAM_UC_LENGTH__   = 300K;
-__RAM_CORE_LENGTH__ = 0K;
-__RAM_EMU_LENGTH__  = 1024K - __RAM_UC_LENGTH__ - __RAM_CORE_LENGTH__;
+__RAM_LENGTH__  = 1024K;
 __AHBRAM_LENGTH__   = 128K;
 __FLASH_LENGTH__    = 256K; /* Bank 1 */
 
 __RAM_START__       = 0x24000000;
 __RAM_UC_START__    = __RAM_START__;
-__RAM_CORE_START__  = __RAM_START__ + __RAM_UC_LENGTH__;
-__RAM_EMU_START__   = __RAM_CORE_START__ + __RAM_CORE_LENGTH__;
-
-__RAM_EMU_END__     = __RAM_EMU_START__ + __RAM_EMU_LENGTH__;
-__RAM_END__         = __RAM_START__ + 1024K;
 
 __INTFLASH__ = DEFINED(__INTFLASH__) ? __INTFLASH__ : 0x08000000;
 
@@ -86,16 +79,11 @@ MEMORY
   /* RAM */
   ITCMRAM  (xrw) : ORIGIN = 0x00000000, LENGTH = __ITCMRAM_LENGTH__
   DTCMRAM  (xrw) : ORIGIN = 0x20000000, LENGTH =  __DTCMRAM_LENGTH__
-  RAM_UC   (xrw) : ORIGIN = __RAM_UC_START__, LENGTH = __RAM_UC_LENGTH__
-  RAM      (xrw) : ORIGIN = __RAM_CORE_START__, LENGTH = __RAM_CORE_LENGTH__
-  RAM_EMU  (xrw) : ORIGIN = __RAM_EMU_START__, LENGTH = __RAM_EMU_LENGTH__
+  RAM      (xrw) : ORIGIN = __RAM_START__, LENGTH = __RAM_LENGTH__
   AHBRAM   (xrw) : ORIGIN = 0x30000000, LENGTH =  __AHBRAM_LENGTH__
 
   /* FLASH */
   FLASH    (xr ) : ORIGIN = __INTFLASH__,        LENGTH =  __FLASH_LENGTH__
-
-  /* CORES */
-  CORES    (x)   : ORIGIN = 0x0,                 LENGTH = 0xFFFFFFFF
 }
 
 
@@ -109,39 +97,11 @@ SECTIONS
   } > ITCMRAM
 
   /* Uncached and unbuffered memory for the LCD framebuffers */
-  ._ram_uc (NOLOAD) :
-  {
-    __ram_uc_start__ = .;
-    . = ALIGN(4);
-    *(.lcd1)
-    *(.lcd2)
-    __ram_uc_end__ = .;
-  } > RAM_UC
-
-  .overlay_nes __RAM_EMU_START__ : {
-    . = ALIGN(4);
-    __ram_emu_nes_start__ = .;
-    build/nes/*.o (.data .data* .text .text* .rodata .rodata*)
-    . = ALIGN(4);
-    _OVERLAY_NES_LOAD_END = .;
-  } AT > CORES
-
-  ._ram (NOLOAD) :
+  .lcd (NOLOAD) :
   {
     . = ALIGN(4);
-    *(.emulator_data)
-    __ram_end__ = .;
+    *(.lcd)
   } > RAM
-
-  ._ahbram (NOLOAD) :
-  {
-    __ahbram_start__ = .;
-    . = ALIGN(4);
-    *(.audio)
-    *(.ahb)
-    . = ALIGN(4);
-    __ahbram_end__ = .;
-  } > AHBRAM
 
   /* The startup code goes first into FLASH */
   .isr_vector :

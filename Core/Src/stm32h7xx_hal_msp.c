@@ -278,7 +278,7 @@ void HAL_DAC_MspDeInit(DAC_HandleTypeDef* hdac)
 void HAL_LTDC_MspInit(LTDC_HandleTypeDef* hltdc)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  if(hltdc->Instance==LTDC)
+    if(hltdc->Instance==LTDC)
   {
   /* USER CODE BEGIN LTDC_MspInit 0 */
 
@@ -396,7 +396,6 @@ void HAL_LTDC_MspInit(LTDC_HandleTypeDef* hltdc)
     HAL_NVIC_SetPriority(LTDC_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(LTDC_IRQn);
   /* USER CODE BEGIN LTDC_MspInit 1 */
-
   /* USER CODE END LTDC_MspInit 1 */
   }
 
@@ -819,94 +818,6 @@ void HAL_WWDG_MspInit(WWDG_HandleTypeDef* hwwdg)
   /* USER CODE END WWDG1_MspInit 1 */
   }
 
-}
-
-extern DMA_HandleTypeDef hdma_sai1_a;
-
-static uint32_t SAI1_client =0;
-
-void HAL_SAI_MspInit(SAI_HandleTypeDef* hsai)
-{
-
-  GPIO_InitTypeDef GPIO_InitStruct;
-/* SAI1 */
-    if(hsai->Instance==SAI1_Block_A)
-    {
-    /* Peripheral clock enable */
-    if (SAI1_client == 0)
-    {
-       __HAL_RCC_SAI1_CLK_ENABLE();
-
-    /* Peripheral interrupt init*/
-    HAL_NVIC_SetPriority(SAI1_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(SAI1_IRQn);
-    }
-    SAI1_client ++;
-
-    /**SAI1_A_Block_A GPIO Configuration
-    PE4     ------> SAI1_FS_A
-    PE5     ------> SAI1_SCK_A
-    PE6     ------> SAI1_SD_A
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
-    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
-    /* Peripheral DMA init*/
-
-    hdma_sai1_a.Instance = DMA1_Stream0;
-    hdma_sai1_a.Init.Request = DMA_REQUEST_SAI1_A;
-    hdma_sai1_a.Init.Direction = DMA_MEMORY_TO_PERIPH;
-    hdma_sai1_a.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_sai1_a.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_sai1_a.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-    hdma_sai1_a.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-    hdma_sai1_a.Init.Mode = DMA_CIRCULAR;
-    hdma_sai1_a.Init.Priority = DMA_PRIORITY_LOW;
-    hdma_sai1_a.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
-    hdma_sai1_a.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
-    hdma_sai1_a.Init.MemBurst = DMA_MBURST_SINGLE;
-    hdma_sai1_a.Init.PeriphBurst = DMA_PBURST_SINGLE;
-    if (HAL_DMA_Init(&hdma_sai1_a) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    /* Several peripheral DMA handle pointers point to the same DMA handle.
-     Be aware that there is only one channel to perform all the requested DMAs. */
-    __HAL_LINKDMA(hsai,hdmarx,hdma_sai1_a);
-
-    __HAL_LINKDMA(hsai,hdmatx,hdma_sai1_a);
-
-    }
-}
-
-void HAL_SAI_MspDeInit(SAI_HandleTypeDef* hsai)
-{
-/* SAI1 */
-    if(hsai->Instance==SAI1_Block_A)
-    {
-    SAI1_client --;
-    if (SAI1_client == 0)
-      {
-      /* Peripheral clock disable */
-       __HAL_RCC_SAI1_CLK_DISABLE();
-      HAL_NVIC_DisableIRQ(SAI1_IRQn);
-      }
-
-    /**SAI1_A_Block_A GPIO Configuration
-    PE4     ------> SAI1_FS_A
-    PE5     ------> SAI1_SCK_A
-    PE6     ------> SAI1_SD_A
-    */
-    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6);
-
-    HAL_DMA_DeInit(hsai->hdmarx);
-    HAL_DMA_DeInit(hsai->hdmatx);
-    }
 }
 
 /* USER CODE BEGIN 1 */

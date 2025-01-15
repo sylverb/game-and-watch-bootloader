@@ -1,4 +1,3 @@
-#include "gw_flash.h"
 #include "gw_linker.h"
 #include <string.h>
 #include <time.h>
@@ -7,7 +6,6 @@
 
 #include "main.h"
 #include "bitmaps.h"
-#include "githash.h"
 #include "ff.h"
 #include "gw_sdcard.h"
 

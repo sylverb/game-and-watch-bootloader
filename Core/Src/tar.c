@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "ff.h"  // For FatFs
+#include "tar.h"
 
 #define BLOCKSIZE 512  // TAR block size
 
@@ -104,7 +105,7 @@ static int is_end_of_archive(const char *p) {
 }
 
 /* Extract a TAR file from FatFs */
-bool extract_tar(const char *tar_path, const char *dest_path) {
+bool extract_tar(const char *tar_path, const char *dest_path, progress_callback_t progress_callback) {
     char block[BLOCKSIZE];
     char tmp_path[256];
     char file_path[256];
@@ -116,21 +117,26 @@ bool extract_tar(const char *tar_path, const char *dest_path) {
 
     res = f_open(&tar_file, tar_path, FA_READ);
     if (res != FR_OK) {
-        printf("Failed to open TAR file: %d\n", res);
         return false;
     }
 
+    unsigned long total_tar_size = f_size(&tar_file);
+    unsigned long current_position = 0;
+
     // Read blocks from the TAR file
     while ((res = f_read(&tar_file, block, BLOCKSIZE, &br)) == FR_OK && br == BLOCKSIZE) {
+        current_position += BLOCKSIZE;
+
         // Check for end of archive
         if (is_end_of_archive(block)) {
-//            printf("End of archive\n");
+            if (progress_callback) {
+                progress_callback(100, file_path);
+            }
             break;
         }
 
         // Verify the checksum
         if (!verify_checksum(block)) {
-//            printf("Invalid checksum\n");
             success = false;
             break;
         }
@@ -141,7 +147,6 @@ bool extract_tar(const char *tar_path, const char *dest_path) {
         unsigned long file_size = parseoct(block + 124, 12);
 
         if (strlen(dest_path) + strlen(tmp_path) + 2 > sizeof(file_path)) {
-//            printf("Error: File path is too long.\n");
             success = false;
             break;
         }
@@ -153,17 +158,14 @@ bool extract_tar(const char *tar_path, const char *dest_path) {
 #pragma GCC diagnostic pop
 
         if (block[156] == '5') {  // Directory
-            printf("Creating directory: %s\n", file_path);
             res = create_dir(file_path);
             if (res != FR_OK) {
-                printf("Failed to create directory: %d\n", res);
                 break;
             }
         } else {  // File
-            printf("Extracting file: %s (%lu bytes)\n", file_path, file_size);
             res = create_file(file_path, &out_file);
             if (res != FR_OK) {
-                printf("Failed to create file: %d\n", res);
+                success = false;
                 break;
             }
 
@@ -171,20 +173,24 @@ bool extract_tar(const char *tar_path, const char *dest_path) {
             while (file_size > 0) {
                 UINT to_read = (file_size > BLOCKSIZE) ? BLOCKSIZE : file_size;
                 res = f_read(&tar_file, block, BLOCKSIZE, &br);
+                current_position += BLOCKSIZE;
                 if (res != FR_OK || br < BLOCKSIZE) {
-                    printf("Failed to read TAR block\n");
+                    success = false;
                     f_close(&out_file);
                     break;
                 }
 
                 res = f_write(&out_file, block, to_read, &bw);
                 if (res != FR_OK || bw < to_read) {
-                    printf("Failed to write file\n");
                     f_close(&out_file);
                     break;
                 }
 
                 file_size -= to_read;
+                if (progress_callback) {
+                    unsigned int percentage = (unsigned int)((current_position * 100) / total_tar_size);
+                    progress_callback(percentage, file_path);
+                }
             }
 
             f_close(&out_file);
@@ -197,6 +203,5 @@ bool extract_tar(const char *tar_path, const char *dest_path) {
         }
     }
     f_close(&tar_file);
-    printf("Extraction complete!\n");
     return success;
 }

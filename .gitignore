@@ -2,8 +2,6 @@ build
 
 Drivers
 
-Core/Inc/githash.h
-
 venv
 
 **/.DS_Store

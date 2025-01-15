@@ -24,11 +24,10 @@
 /* USER CODE BEGIN Includes */
 #include "stm32h7xx_hal.h"
 #include "gw_buttons.h"
-#include "gw_flash.h"
+#include "gw_lcd.h"
 #include "gw_sdcard.h"
-#include "gw_audio.h"
+#include "gw_gui.h"
 #include "gw_linker.h"
-#include "githash.h"
 #include "bitmaps.h"
 #include "bootloader.h"
 
@@ -38,6 +37,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "ff.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,6 +74,7 @@ DMA_HandleTypeDef hdma_sai1_a;
 
 sdcard_hw_type_t sdcard_hw_type = SDCARD_HW_UNDETECTED;
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim1;
 
@@ -81,6 +82,7 @@ WWDG_HandleTypeDef hwwdg1;
 
 /* USER CODE BEGIN PV */
 
+PERSISTENT(boot_magic) volatile uint32_t boot_magic;
 uint32_t log_idx PERSISTENT(log_idx);
 char logbuf[1024 * 4] PERSISTENT(logbuf) __attribute__((aligned(4)));
 
@@ -93,10 +95,13 @@ static bool wdog_enabled;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
+void SystemClock_Config();
 static void MPU_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
+static void MX_LTDC_Init(void);
+static void MX_SPI2_Init(void);
+static void MX_OCTOSPI1_Init(void);
 static void MX_SAI1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_DAC1_Init(void);
@@ -104,9 +109,10 @@ static void MX_DAC2_Init(void);
 static void MX_WWDG1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
-void app_main();
+void app_main(uint8_t boot_mode);
 
 /* USER CODE END PFP */
 
@@ -139,12 +145,16 @@ void GW_EnterDeepSleep(void)
   // Enable wakup by PIN1, the power button
   HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1_LOW);
 
+  lcd_backlight_off();
+
   // Delay 500ms to give us a chance to attach a debugger in case
   // we end up in a suspend-loop.
   for (int i = 0; i < 10; i++) {
       wdog_refresh();
       HAL_Delay(50);
   }
+  // Deinit the LCD, save power.
+  lcd_deinit(&hspi2);
 
   // Unmount Fs and Deinit SD Card if needed
   if (fs_mounted) {
@@ -235,6 +245,9 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+  MX_LTDC_Init();
+  MX_SPI2_Init();
+  MX_OCTOSPI1_Init();
   MX_SAI1_Init();
   MX_RTC_Init();
   MX_DAC1_Init();
@@ -242,10 +255,35 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM1_Init();
 
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
   // Save the button states as early as possible
   boot_buttons = buttons_get();
+
+  lcd_backlight_off();
+
+  /* Power off LCD and external Flash */
+  lcd_deinit(&hspi2);
+
+  // Keep this
+  // at least 8 frames at the end of power down (lcd_deinit())
+  // 4 x 50 ms => 200ms
+  for (int i = 0; i < 4; i++) {
+    wdog_refresh();
+    HAL_Delay(50);
+  }
+
+  /* Power on LCD and external Flash */
+  lcd_init(&hspi2, &hltdc);
+
+  // Keep this
+  for (int i = 0; i < 4; i++) {
+    wdog_refresh();
+    HAL_Delay(50);
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -275,12 +313,17 @@ int main(void)
   * @brief System Clock Configuration
   * @retval None
   */
-void SystemClock_Config(void)
+void SystemClock_Config()
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
   RCC_CRSInitTypeDef RCC_CRSInitStruct = {0};
+
+  /* Make sure we are running on HSI clock
+     before we start changing the PLL settings */
+  RCC->CFGR &= ~RCC_CFGR_SW;
+  RCC->CFGR |= RCC_CFGR_SW_HSI;
 
   /** Supply configuration update enable
   */
@@ -309,6 +352,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  /*
+    NORMAL : PLLM = 16 PLLN=140 PLLP=2 PLLQ=2 PLLR=2 Clock is ClockP >> 280MHz and OSPI 64MHz
+    BOOST 1: PLLM = 16 PLLN=156 PLLP=2 PLLQ=6 PLLR=2 CLOCKPLL >> 312MHz CoreClock and OSPI 104MHz
+    BOOST 2: PLLM = 38 PLLN=420 PLLP=2 PLLQ=7 PLLR=2 CLOCKPLL >> 3..MHz CoreClock and OSPI 100MHz
+    CoreClock= HSI/PLLM x PLLN/PLLP
+    OSPIClock= HSI/PLLM x PLLN/PLLQ
+  */
   RCC_OscInitStruct.PLL.PLLM = 16;
   RCC_OscInitStruct.PLL.PLLN = 140;
   RCC_OscInitStruct.PLL.PLLP = 2;
@@ -383,6 +433,17 @@ void SystemClock_Config(void)
   RCC_CRSInitStruct.HSI48CalibrationValue = 32;
 
   HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* OCTOSPI1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(OCTOSPI1_IRQn);
 }
 
 /**
@@ -540,6 +601,123 @@ static void MX_DAC2_Init(void)
 }
 
 /**
+  * @brief LTDC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LTDC_Init(void)
+{
+
+  /* USER CODE BEGIN LTDC_Init 0 */
+
+  /* USER CODE END LTDC_Init 0 */
+
+  LTDC_LayerCfgTypeDef pLayerCfg = {0};
+
+  /* USER CODE BEGIN LTDC_Init 1 */
+
+  /* USER CODE END LTDC_Init 1 */
+  hltdc.Instance = LTDC;
+  hltdc.Init.HSPolarity = LTDC_HSPOLARITY_AL;
+  hltdc.Init.VSPolarity = LTDC_VSPOLARITY_AL;
+  hltdc.Init.DEPolarity = LTDC_DEPOLARITY_AL;
+  hltdc.Init.PCPolarity = LTDC_PCPOLARITY_IIPC;
+  hltdc.Init.HorizontalSync = 9;
+  hltdc.Init.VerticalSync = 1;
+  hltdc.Init.AccumulatedHBP = 60;
+  hltdc.Init.AccumulatedVBP = 7;
+  hltdc.Init.AccumulatedActiveW = 380;
+  hltdc.Init.AccumulatedActiveH = 247;
+  hltdc.Init.TotalWidth = 392;
+  hltdc.Init.TotalHeigh = 255;
+  hltdc.Init.Backcolor.Blue = 0;
+  hltdc.Init.Backcolor.Green = 0;
+  hltdc.Init.Backcolor.Red = 0;
+  if (HAL_LTDC_Init(&hltdc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  pLayerCfg.WindowX0 = 0;
+  pLayerCfg.WindowX1 = 320;
+  pLayerCfg.WindowY0 = 0;
+  pLayerCfg.WindowY1 = 240;
+#ifdef GW_LCD_MODE_LUT8
+  pLayerCfg.PixelFormat = LTDC_PIXEL_FORMAT_L8;
+#else
+  pLayerCfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
+#endif
+  pLayerCfg.Alpha = 255;
+  pLayerCfg.Alpha0 = 255;
+  pLayerCfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
+  pLayerCfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
+  pLayerCfg.FBStartAdress = 0x24000000;
+  pLayerCfg.ImageWidth = 320;
+  pLayerCfg.ImageHeight = 240;
+  pLayerCfg.Backcolor.Blue = 0;
+  pLayerCfg.Backcolor.Green = 255;
+  pLayerCfg.Backcolor.Red = 0;
+  if (HAL_LTDC_ConfigLayer(&hltdc, &pLayerCfg, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LTDC_Init 2 */
+
+  /* USER CODE END LTDC_Init 2 */
+
+}
+
+/**
+  * @brief OCTOSPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_OCTOSPI1_Init(void)
+{
+
+  /* USER CODE BEGIN OCTOSPI1_Init 0 */
+
+  /* USER CODE END OCTOSPI1_Init 0 */
+
+  OSPIM_CfgTypeDef sOspiManagerCfg = {0};
+
+  /* USER CODE BEGIN OCTOSPI1_Init 1 */
+
+  /* USER CODE END OCTOSPI1_Init 1 */
+  /* OCTOSPI1 parameter configuration*/
+  hospi1.Instance = OCTOSPI1;
+  hospi1.Init.FifoThreshold = 4;
+  hospi1.Init.DualQuad = HAL_OSPI_DUALQUAD_DISABLE;
+  hospi1.Init.MemoryType = HAL_OSPI_MEMTYPE_MACRONIX;
+  hospi1.Init.DeviceSize = 28;
+  hospi1.Init.ChipSelectHighTime = 2;
+  hospi1.Init.FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE;
+  hospi1.Init.ClockMode = HAL_OSPI_CLOCK_MODE_0;
+  hospi1.Init.WrapSize = HAL_OSPI_WRAP_NOT_SUPPORTED;
+  hospi1.Init.ClockPrescaler = 1;
+  hospi1.Init.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE;
+  hospi1.Init.DelayHoldQuarterCycle = HAL_OSPI_DHQC_DISABLE;
+  hospi1.Init.ChipSelectBoundary = 0;
+  hospi1.Init.DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_BYPASSED;
+  hospi1.Init.MaxTran = 0;
+  hospi1.Init.Refresh = 0;
+  if (HAL_OSPI_Init(&hospi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sOspiManagerCfg.ClkPort = 1;
+  sOspiManagerCfg.NCSPort = 1;
+  sOspiManagerCfg.IOLowPort = HAL_OSPIM_IOPORT_1_LOW;
+  if (HAL_OSPIM_Config(&hospi1, &sOspiManagerCfg, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN OCTOSPI1_Init 2 */
+
+  /* USER CODE END OCTOSPI1_Init 2 */
+
+}
+
+/**
   * @brief RTC Initialization Function
   * @param None
   * @retval None
@@ -683,6 +861,54 @@ void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES_TXONLY;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 0x0;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi2.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi2.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi2.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi2.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -895,32 +1121,6 @@ int __builtin_popcount (unsigned int x);
 
 void MPU_Config(void)
 {
-
-#if 0
-  MPU_Region_InitTypeDef MPU_InitStruct = {0};
-
-  /* Disables the MPU */
-  HAL_MPU_Disable();
-
-  // Configure DTCRAM @0x20000000 (64KB)
-  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.Number = MPU_REGION_NUMBER7;
-  MPU_InitStruct.BaseAddress = 0x20000000;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_64KB;
-  MPU_InitStruct.SubRegionDisable = 0x0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
-
-  /* Réactiver le MPU avec la configuration par défaut */
-  HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
-#endif
-#if 0
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
   /* Disables the MPU */
@@ -934,23 +1134,6 @@ void MPU_Config(void)
   MPU_InitStruct.SubRegionDisable = 0x0;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
   MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
-
-  /* Only continue if a single bit set in __NULLPTR_LENGTH__.
-    * The MPU can only handle memory sizes which are a power of 2 */
-  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.Number = MPU_REGION_NUMBER1;
-  MPU_InitStruct.BaseAddress = 0x00000000;
-  /* 128B --> 0x06, 256B --> 0x07, 512B --> 0x08, ... */
-  MPU_InitStruct.Size = MPU_REGION_SIZE_128KB;
-  MPU_InitStruct.SubRegionDisable = 0x0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
   MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
   MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
@@ -994,7 +1177,6 @@ void MPU_Config(void)
 
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
-#endif
 
 }
 
@@ -1006,14 +1188,7 @@ __attribute__((optimize("-O0"))) void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  printf("Error_Handler()\n");
-  while(1) {
-    wdog_refresh();
-    if (buttons_get() & B_POWER)
-    {
-        GW_EnterDeepSleep();
-    }
-  }
+
   /* USER CODE END Error_Handler_Debug */
 }
 

@@ -97,8 +97,6 @@ void common_fault_handler_c(sContextStateFrame *frame, int type)
 extern ADC_HandleTypeDef hadc1;
 extern LTDC_HandleTypeDef hltdc;
 extern OSPI_HandleTypeDef hospi1;
-extern DMA_HandleTypeDef hdma_sai1_a;
-extern SAI_HandleTypeDef hsai_BlockA1;
 extern TIM_HandleTypeDef htim1;
 extern WWDG_HandleTypeDef hwwdg1;
 /* USER CODE BEGIN EV */
@@ -256,7 +254,6 @@ void DMA1_Stream0_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
 
   /* USER CODE END DMA1_Stream0_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_sai1_a);
   /* USER CODE BEGIN DMA1_Stream0_IRQn 1 */
 
   /* USER CODE END DMA1_Stream0_IRQn 1 */
@@ -323,7 +320,6 @@ void SAI1_IRQHandler(void)
   /* USER CODE BEGIN SAI1_IRQn 0 */
 
   /* USER CODE END SAI1_IRQn 0 */
-  HAL_SAI_IRQHandler(&hsai_BlockA1);
   /* USER CODE BEGIN SAI1_IRQn 1 */
 
   /* USER CODE END SAI1_IRQn 1 */

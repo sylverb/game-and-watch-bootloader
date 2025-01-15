@@ -10,6 +10,8 @@
 #include "gw_sdcard.h"
 #include "main.h"
 #include "rg_rtc.h"
+#include "gw_lcd.h"
+#include "gw_gui.h"
 #include "bootloader.h"
 #include "gw_buttons.h"
 #include "gw_timer.h"
@@ -63,6 +65,14 @@ void sdcard_hw_detect()
 
     // No SD Card detected
     sdcard_hw_type = SDCARD_HW_NO_SD_FOUND;
+}
+
+bool file_exists(const char *path) {
+    FILINFO fileInfo;
+    FRESULT result;
+
+    result = f_stat(path, &fileInfo);
+    return (result == FR_OK);
 }
 
 /**
@@ -196,6 +206,11 @@ bool update_bank2_flash()
     return update_status;
 }
 
+void show_progress_cb(unsigned int percentage, const char *file_name) {
+    gw_gui_draw_progress_bar(10, 80, 300, 8, percentage, RGB24_TO_RGB565(255, 255, 255), RGB24_TO_RGB565(255, 255, 255));
+    gw_gui_draw_text(10, 60, file_name, RGB24_TO_RGB565(255, 255, 255));
+}
+
 void bootloader_main(void)
 {
     printf("bootloader_main()\n");
@@ -208,27 +223,50 @@ void bootloader_main(void)
     }
     else
     {
-        // Check if update archive file is present
-        // Elseway, check if update binary file is present
-        if (extract_tar(UPDATE_ARCHIVE_FILE, ""))
+        if (file_exists(UPDATE_ARCHIVE_FILE))
         {
-            f_unlink(UPDATE_ARCHIVE_FILE);
-            if (update_bank2_flash()) {
-                printf("Firmware update done\n");
-            }
-            else
+            gw_gui_fill(0x0000);
+            lcd_backlight_set(180);
+            gw_gui_draw();
+            // Extract update archive in root folder
+            gw_gui_draw_text(10, 50, "Extracting update archive", RGB24_TO_RGB565(0, 255, 0));
+            if (extract_tar(UPDATE_ARCHIVE_FILE, "", show_progress_cb))
             {
-                printf("Firmware update failed\n");
+                // Delete update archive
+                f_unlink(UPDATE_ARCHIVE_FILE);
+
+                // Flash bank 2
+                if (update_bank2_flash()) {
+                    gw_gui_draw_text(10, 50, "Firmware update done", RGB24_TO_RGB565(0, 255, 0));
+                }
+                else
+                {
+                    gw_gui_draw_text(10, 50, "Firmware update failed", RGB24_TO_RGB565(255, 0, 0));
+                }
+            } else {
+                gw_gui_draw_text(10, 50, "Firmware update extract failed", RGB24_TO_RGB565(255, 0, 0));
             }
-        }
-        else
-        {
-            if (update_bank2_flash()) {
-                printf("Firmware update done\n");
+
+            f_unmount("");
+            switch (sdcard_hw_type) {
+                case SDCARD_HW_SPI1:
+                    sdcard_deinit_spi1();
+                break;
+                case SDCARD_HW_OSPI1:
+                    sdcard_deinit_ospi1();
+                break;
+                default:
+                break;
             }
-            else
-            {
-                printf("Firmware update failed\n");
+
+            while(1) {
+                uint32_t boot_buttons = buttons_get();
+                if (boot_buttons) {
+                    while (1) {
+                        boot_bank2();
+                    }
+                    break;
+                }
             }
         }
     }
