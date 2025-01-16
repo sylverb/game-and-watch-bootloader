@@ -1,37 +1,21 @@
-#include <assert.h>
-#include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <stdbool.h>
 
 #include "gw_sdcard.h"
-#include "main.h"
-#include "rg_rtc.h"
 #include "gw_lcd.h"
 #include "gw_gui.h"
-#include "bootloader.h"
 #include "gw_buttons.h"
-#include "gw_timer.h"
 #include "main.h"
-#include "stm32h7xx_hal.h"
-
+#include "gw_intflash.h"
 #include "ff.h"
 #include "tar.h"
+#include "bootloader.h"
 
 #define UPDATE_ARCHIVE_FILE "/gw_fw_update.tar"
-#define INTFLASH_2_UPDATE_FILE "/update_bank2.bin"
-#define INTFLASH_2_SIZE (256 << 10) // 256KB
-#define BUFFER_SIZE 256
 
 extern sdcard_hw_type_t sdcard_hw_type;
 
 static FATFS FatFs; // Fatfs handle
-static FIL file;
-UINT bytesRead;
-uint8_t buffer[BUFFER_SIZE];
 
 void sdcard_hw_detect()
 {
@@ -75,57 +59,6 @@ bool file_exists(const char *path) {
     return (result == FR_OK);
 }
 
-/**
- * @param bank - Must be 2.
- * @param offset - Must be a multiple of 8192
- * @param size - Must be a multiple of 8192
- */
-uint32_t erase_intflash(uint8_t bank, uint32_t offset, uint32_t size)
-{
-    static FLASH_EraseInitTypeDef EraseInitStruct;
-    uint32_t PAGEError;
-
-    assert(bank == 2);
-    assert((offset & 0x1fff) == 0);
-    assert((size & 0x1fff) == 0);
-
-    HAL_FLASH_Unlock();
-
-    EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
-    EraseInitStruct.Banks = bank; // Must be 2
-    EraseInitStruct.Sector = offset >> 13;
-    EraseInitStruct.NbSectors = size >> 13;
-
-    if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    HAL_FLASH_Lock();
-
-    return 0;
-}
-
-HAL_StatusTypeDef flash_write(uint32_t flash_address, uint8_t *data, uint32_t length)
-{
-    // A flash word is 128bits (16 bytes)
-    HAL_StatusTypeDef status;
-    HAL_FLASH_Unlock();
-    for (uint32_t i = 0; i < length; i += 16)
-    {
-        uint32_t data_address = (uint32_t)(data) + i;
-        status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, flash_address + i, data_address);
-        if (status != HAL_OK)
-        {
-            printf("status %x\n", status);
-            HAL_FLASH_Lock();
-            return status;
-        }
-    }
-    HAL_FLASH_Lock();
-    return HAL_OK;
-}
-
 static void __attribute__((naked)) start_app(void (*const pc)(void), uint32_t sp)
 {
     __asm("           \n\
@@ -155,60 +88,24 @@ void boot_bank2(void)
     }
 }
 
-bool update_bank2_flash()
-{
-    bool update_status = true;
-    FRESULT res;
-
-    res = f_open(&file, INTFLASH_2_UPDATE_FILE, FA_READ);
-    if (res != FR_OK)
-    {
-        printf("No update file found\n");
-        return false;
-    }
-
-    uint32_t flash_address = FLASH_BANK2_BASE;
-
-    // File is present, erase bank
-    erase_intflash(2, FLASH_SECTOR_0, INTFLASH_2_SIZE);
-
-    do
-    {
-        res = f_read(&file, buffer, BUFFER_SIZE, &bytesRead);
-        if (res != FR_OK)
-        {
-            update_status = false;
-            break;
-        }
-
-        // Write block in internal flash bank
-        if (flash_write(flash_address, buffer, bytesRead) != HAL_OK)
-        {
-            update_status = false;
-            printf("Flash writing error @0x%lx - %d\n", flash_address, bytesRead);
-            break;
-        }
-
-        // Next block
-        flash_address += bytesRead;
-    } while (bytesRead == BUFFER_SIZE);
-
-    f_close(&file);
-    if (update_status)
-    {
-        printf("Flashing done, delete update file\n");
-        f_unlink(INTFLASH_2_UPDATE_FILE);
-    }
-    else
-    {
-        printf("Flashing failed\n");
-    }
-    return update_status;
-}
-
-void show_progress_cb(unsigned int percentage, const char *file_name) {
+void show_untar_progress_cb(unsigned int percentage, const char *file_name) {
     gw_gui_draw_progress_bar(10, 80, 300, 8, percentage, RGB24_TO_RGB565(255, 255, 255), RGB24_TO_RGB565(255, 255, 255));
     gw_gui_draw_text(10, 60, file_name, RGB24_TO_RGB565(255, 255, 255));
+    if (percentage == 100) {
+        // Delete progress bar and text
+        gw_gui_draw_text(10, 60, "", RGB24_TO_RGB565(255, 255, 255));
+        gw_gui_draw_text(10, 80, "", RGB24_TO_RGB565(255, 255, 255));
+    }
+}
+
+void show_flash_progress_cb(unsigned int percentage) {
+    gw_gui_draw_progress_bar(10, 80, 300, 8, percentage, RGB24_TO_RGB565(255, 255, 255), RGB24_TO_RGB565(255, 255, 255));
+    printf("Flashing progress: %d%%\n", percentage);
+    if (percentage == 100) {
+        // Delete progress bar and text
+        gw_gui_draw_text(10, 60, "", RGB24_TO_RGB565(255, 255, 255));
+        gw_gui_draw_text(10, 80, "", RGB24_TO_RGB565(255, 255, 255));
+    }
 }
 
 void bootloader_main(void)
@@ -229,15 +126,16 @@ void bootloader_main(void)
             lcd_backlight_set(180);
             gw_gui_draw();
             // Extract update archive in root folder
-            gw_gui_draw_text(10, 50, "Extracting update archive", RGB24_TO_RGB565(0, 255, 0));
-            if (extract_tar(UPDATE_ARCHIVE_FILE, "", show_progress_cb))
+            gw_gui_draw_text(10, 50, "Extracting files", RGB24_TO_RGB565(0, 255, 0));
+            if (extract_tar(UPDATE_ARCHIVE_FILE, "", show_untar_progress_cb))
             {
                 // Delete update archive
                 f_unlink(UPDATE_ARCHIVE_FILE);
 
                 // Flash bank 2
-                if (update_bank2_flash()) {
+                if (update_bank2_flash(show_flash_progress_cb)) {
                     gw_gui_draw_text(10, 50, "Firmware update done", RGB24_TO_RGB565(0, 255, 0));
+                    gw_gui_draw_text(10, 60, "Press any button to continue", RGB24_TO_RGB565(0, 255, 0));
                 }
                 else
                 {

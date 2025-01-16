@@ -16,6 +16,7 @@ endif
 # C sources
 C_SOURCES =  \
 Core/Src/gw_buttons.c \
+Core/Src/gw_intflash.c \
 Core/Src/gw_lcd.c \
 Core/Src/gw_sdcard.c \
 Core/Src/gw_timer.c \
