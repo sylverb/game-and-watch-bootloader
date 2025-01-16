@@ -5,7 +5,6 @@
 #include "stm32h7xx.h"
 
 #include "main.h"
-#include "bitmaps.h"
 #include "ff.h"
 #include "gw_sdcard.h"
 

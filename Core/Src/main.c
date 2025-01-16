@@ -28,7 +28,6 @@
 #include "gw_sdcard.h"
 #include "gw_gui.h"
 #include "gw_linker.h"
-#include "bitmaps.h"
 #include "bootloader.h"
 
 #include "bq24072.h"

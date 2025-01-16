@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
-#include "rg_rtc.h"
 
 extern uint32_t log_idx;
 extern char logbuf[1024 * 4];
