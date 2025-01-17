@@ -2,16 +2,13 @@
 #include <stdbool.h>
 
 #include "gw_sdcard.h"
-#include "gw_lcd.h"
-#include "gw_gui.h"
-#include "gw_buttons.h"
 #include "main.h"
-#include "gw_intflash.h"
 #include "ff.h"
-#include "tar.h"
 #include "bootloader.h"
 
-#define UPDATE_ARCHIVE_FILE "/gw_fw_update.tar"
+#define FIRMWARE_UPDATE_FILE "/firmware_update.bin"
+#define RAM_START D1_AXISRAM_BASE /* 0x24000000 */
+#define MAX_FILE_SIZE (1024 * 1024) /* 1MB of SRAM */
 
 extern sdcard_hw_type_t sdcard_hw_type;
 
@@ -59,6 +56,45 @@ bool file_exists(const char *path) {
     return (result == FR_OK);
 }
 
+bool load_file_to_ram(const char *file_path, uint32_t ram_address) {
+    FIL file;
+    FRESULT res;
+    UINT bytes_read;
+    uint8_t *ram_ptr = (uint8_t *)ram_address;
+
+    res = f_open(&file, file_path, FA_READ);
+    if (res != FR_OK) {
+        printf("Failed to open file: %s (Error: %d)\n", file_path, res);
+        return false;
+    }
+
+    if (f_size(&file) > MAX_FILE_SIZE) {
+        printf("File size exceeds available RAM: %llu bytes\n", f_size(&file));
+        f_close(&file);
+        return false;
+    }
+
+    while (1) {
+        res = f_read(&file, ram_ptr, 512, &bytes_read);
+        if (res != FR_OK) {
+            printf("Failed to read file (Error: %d)\n", res);
+            f_close(&file);
+            return false;
+        }
+
+        if (bytes_read == 0) {
+            break;
+        }
+
+        ram_ptr += bytes_read;
+    }
+
+    f_close(&file);
+
+    printf("File successfully loaded to RAM at 0x%08lX\n", ram_address);
+    return true;
+}
+
 static void __attribute__((naked)) start_app(void (*const pc)(void), uint32_t sp)
 {
     __asm("           \n\
@@ -88,24 +124,21 @@ void boot_bank2(void)
     }
 }
 
-void show_untar_progress_cb(unsigned int percentage, const char *file_name) {
-    gw_gui_draw_progress_bar(10, 80, 300, 8, percentage, RGB24_TO_RGB565(255, 255, 255), RGB24_TO_RGB565(255, 255, 255));
-    gw_gui_draw_text(10, 60, file_name, RGB24_TO_RGB565(255, 255, 255));
-    if (percentage == 100) {
-        // Delete progress bar and text
-        gw_gui_draw_text(10, 60, "", RGB24_TO_RGB565(255, 255, 255));
-        gw_gui_draw_text(10, 80, "", RGB24_TO_RGB565(255, 255, 255));
-    }
+void set_vtor(uint32_t address) {
+    SCB->VTOR = address;
+    __DSB();
+    __ISB();
 }
 
-void show_flash_progress_cb(unsigned int percentage) {
-    gw_gui_draw_progress_bar(10, 80, 300, 8, percentage, RGB24_TO_RGB565(255, 255, 255), RGB24_TO_RGB565(255, 255, 255));
-    printf("Flashing progress: %d%%\n", percentage);
-    if (percentage == 100) {
-        // Delete progress bar and text
-        gw_gui_draw_text(10, 60, "", RGB24_TO_RGB565(255, 255, 255));
-        gw_gui_draw_text(10, 80, "", RGB24_TO_RGB565(255, 255, 255));
-    }
+void boot_ram(void)
+{
+    uint32_t sp = *((uint32_t *)RAM_START);
+    uint32_t pc = *((uint32_t *)RAM_START + 1);
+
+    __set_MSP(sp);
+    __set_PSP(sp);
+    set_vtor(RAM_START);
+    start_app((void (*const)(void))pc, (uint32_t)sp);
 }
 
 void bootloader_main(void)
@@ -117,34 +150,9 @@ void bootloader_main(void)
     if (sdcard_hw_type == SDCARD_HW_NO_SD_FOUND)
     {
         printf("No SD Card found\n");
-    }
-    else
-    {
-        if (file_exists(UPDATE_ARCHIVE_FILE))
-        {
-            gw_gui_fill(0x0000);
-            lcd_backlight_set(180);
-            gw_gui_draw();
-            // Extract update archive in root folder
-            gw_gui_draw_text(10, 50, "Extracting files", RGB24_TO_RGB565(0, 255, 0));
-            if (extract_tar(UPDATE_ARCHIVE_FILE, "", show_untar_progress_cb))
-            {
-                // Delete update archive
-                f_unlink(UPDATE_ARCHIVE_FILE);
-
-                // Flash bank 2
-                if (update_bank2_flash(show_flash_progress_cb)) {
-                    gw_gui_draw_text(10, 50, "Firmware update done", RGB24_TO_RGB565(0, 255, 0));
-                    gw_gui_draw_text(10, 60, "Press any button to continue", RGB24_TO_RGB565(0, 255, 0));
-                }
-                else
-                {
-                    gw_gui_draw_text(10, 50, "Firmware update failed", RGB24_TO_RGB565(255, 0, 0));
-                }
-            } else {
-                gw_gui_draw_text(10, 50, "Firmware update extract failed", RGB24_TO_RGB565(255, 0, 0));
-            }
-
+    } else {
+        if (load_file_to_ram(FIRMWARE_UPDATE_FILE, RAM_START)) {
+            // Unmount Fs and Deinit SD Card
             f_unmount("");
             switch (sdcard_hw_type) {
                 case SDCARD_HW_SPI1:
@@ -156,16 +164,7 @@ void bootloader_main(void)
                 default:
                 break;
             }
-
-            while(1) {
-                uint32_t boot_buttons = buttons_get();
-                if (boot_buttons) {
-                    while (1) {
-                        boot_bank2();
-                    }
-                    break;
-                }
-            }
+            boot_ram();
         }
     }
 
@@ -183,9 +182,7 @@ void bootloader_main(void)
         default:
         break;
     }
-
-    while (1)
-    {
+    while (1) {
         boot_bank2();
     }
 }

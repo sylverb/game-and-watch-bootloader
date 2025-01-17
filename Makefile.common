@@ -189,9 +189,6 @@ SDK_URL ?= https://raw.githubusercontent.com/STMicroelectronics/STM32CubeH7
 # Local path for the SDK
 SDK_DIR ?= Drivers
 
-# Patch file marker
-PATCH_MARKER = $(SDK_DIR)/.patched
-
 # SDK C sources
 SDK_C_SOURCES =  \
 Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c \
@@ -463,11 +460,11 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(FATFS_OBJECTS) Makefile.common Makefile
 	$(V)$(ECHO) [ LD ] $(notdir $@)
 	$(V)$(CC) $(OBJECTS) $(FATFS_OBJECTS) $(LDFLAGS) -o $@
 
-$(BUILD_DIR)/core/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) $(PATCH_MARKER) | $(BUILD_DIR)
+$(BUILD_DIR)/core/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) | $(BUILD_DIR)
 	$(V)$(ECHO) [ CC core ] $(notdir $<)
 	$(V)$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/core/$(notdir $(<:.c=.lst)) $< -o $@
 
-$(BUILD_DIR)/fatfs/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) $(PATCH_MARKER) | $(BUILD_DIR)
+$(BUILD_DIR)/fatfs/%.o: %.c Makefile.common Makefile $(SDK_HEADERS) | $(BUILD_DIR)
 	$(V)$(ECHO) [ CC FatFs ] $(notdir $<)
 	$(V)$(CC) -c $(CFLAGS) $(FATFS_C_INCLUDES) -Wa,-a,-ad,-alms=$(BUILD_DIR)/fatfs/$(notdir $(<:.c=.lst)) $< -o $@
 
@@ -645,14 +642,8 @@ $(SDK_DIR)/%:
 	$(V)$(ECHO) [ WGET ] $(notdir $@)
 	$(V)wget -q $(SDK_URL)/$(SDK_VERSION)/$@ -P $(dir $@)
 
-# Rule to apply the patch
-$(PATCH_MARKER):
-	$(V)$(ECHO) [ PATCH ] Applying Drivers patch
-	$(V)patch $< < tools/drivers_enable_bank2_flashing.patch
-	$(V)touch $@
-
 .PHONY: download_sdk
-download_sdk: $(SDK_HEADERS) $(SDK_C_SOURCES) $(SDK_ASM_SOURCES) $(PATCH_MARKER)
+download_sdk: $(SDK_HEADERS) $(SDK_C_SOURCES) $(SDK_ASM_SOURCES)
 
 #######################################
 # clean up

@@ -23,10 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32h7xx_hal.h"
-#include "gw_buttons.h"
-#include "gw_lcd.h"
 #include "gw_sdcard.h"
-#include "gw_gui.h"
 #include "gw_linker.h"
 #include "bootloader.h"
 
@@ -85,8 +82,6 @@ PERSISTENT(boot_magic) volatile uint32_t boot_magic;
 uint32_t log_idx PERSISTENT(log_idx);
 char logbuf[1024 * 4] PERSISTENT(logbuf) __attribute__((aligned(4)));
 
-uint32_t boot_buttons;
-
 uint32_t uptime_s;
 
 static bool wdog_enabled;
@@ -144,16 +139,12 @@ void GW_EnterDeepSleep(void)
   // Enable wakup by PIN1, the power button
   HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1_LOW);
 
-  lcd_backlight_off();
-
   // Delay 500ms to give us a chance to attach a debugger in case
   // we end up in a suspend-loop.
   for (int i = 0; i < 10; i++) {
       wdog_refresh();
       HAL_Delay(50);
   }
-  // Deinit the LCD, save power.
-  lcd_deinit(&hspi2);
 
   // Unmount Fs and Deinit SD Card if needed
   if (fs_mounted) {
@@ -178,12 +169,6 @@ void GW_EnterDeepSleep(void)
     HAL_NVIC_SystemReset();
   }
 
-}
-
-// Returns buttons that were pressed at boot
-uint32_t GW_GetBootButtons(void)
-{
-  return boot_buttons;
 }
 
 void wdog_enable()
@@ -257,32 +242,6 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
-  // Save the button states as early as possible
-  boot_buttons = buttons_get();
-
-  lcd_backlight_off();
-
-  /* Power off LCD and external Flash */
-  lcd_deinit(&hspi2);
-
-  // Keep this
-  // at least 8 frames at the end of power down (lcd_deinit())
-  // 4 x 50 ms => 200ms
-  for (int i = 0; i < 4; i++) {
-    wdog_refresh();
-    HAL_Delay(50);
-  }
-
-  /* Power on LCD and external Flash */
-  lcd_init(&hspi2, &hltdc);
-
-  // Keep this
-  for (int i = 0; i < 4; i++) {
-    wdog_refresh();
-    HAL_Delay(50);
-  }
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
