@@ -109,7 +109,7 @@ void boot_bank2(void)
     uint32_t pc = *((uint32_t *)FLASH_BANK2_BASE + 1);
 
     // Check that Bank 2 content is valid
-    if ((pc > FLASH_BANK2_BASE) && (pc < FLASH_END))
+    if ((pc > FLASH_BANK2_BASE) && (pc < FLASH_BANK2_BASE + 256*1024))
     {
         __set_MSP(sp);
         __set_PSP(sp);
@@ -118,9 +118,11 @@ void boot_bank2(void)
     }
     else
     {
-        while(1) {
-            wdog_refresh();
-        }
+        // Wait 60 seconds before power off
+        // This is to give the user a chance to interact with the device
+        // while content of Bank 2 is invalid
+        HAL_Delay(60000);
+        GW_EnterDeepSleep();
     }
 }
 
