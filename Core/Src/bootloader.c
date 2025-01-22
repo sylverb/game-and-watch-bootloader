@@ -6,7 +6,7 @@
 #include "ff.h"
 #include "bootloader.h"
 
-#define FIRMWARE_UPDATE_FILE "/firmware_update.bin"
+#define FIRMWARE_UPDATE_FILE "/retro-go_update.bin"
 #define RAM_START D1_AXISRAM_BASE /* 0x24000000 */
 #define MAX_FILE_SIZE (1024 * 1024) /* 1MB of SRAM */
 
@@ -61,6 +61,8 @@ bool load_file_to_ram(const char *file_path, uint32_t ram_address) {
     FRESULT res;
     UINT bytes_read;
     uint8_t *ram_ptr = (uint8_t *)ram_address;
+    size_t file_size;
+    size_t remaining;
 
     res = f_open(&file, file_path, FA_READ);
     if (res != FR_OK) {
@@ -68,14 +70,30 @@ bool load_file_to_ram(const char *file_path, uint32_t ram_address) {
         return false;
     }
 
-    if (f_size(&file) > MAX_FILE_SIZE) {
-        printf("File size exceeds available RAM: %llu bytes\n", f_size(&file));
-        f_close(&file);
-        return false;
+    if (f_size(&file) > MAX_FILE_SIZE + sizeof(uint32_t)) {
+        // file is including update archive and size in stored after the 1MB limit
+        f_lseek(&file, MAX_FILE_SIZE);
+        res = f_read(&file, &file_size, sizeof(file_size), &bytes_read);
+        if (res != FR_OK || bytes_read != sizeof(file_size)) {
+            printf("Failed to read file size from the end of the file (Error: %d)\n", res);
+            f_close(&file);
+            return false;
+        }
+        f_lseek(&file, 0);
+        if (file_size > MAX_FILE_SIZE) {
+            printf("File size exceeds available RAM: %u bytes\n", file_size);
+            f_close(&file);
+            return false;
+        }
+    } else {
+        file_size = f_size(&file);
     }
 
-    while (1) {
-        res = f_read(&file, ram_ptr, 512, &bytes_read);
+    remaining = file_size;
+
+    while (remaining > 0) {
+        size_t to_read = (remaining > 512) ? 512 : remaining;
+        res = f_read(&file, ram_ptr, to_read, &bytes_read);
         if (res != FR_OK) {
             printf("Failed to read file (Error: %d)\n", res);
             f_close(&file);
@@ -87,11 +105,12 @@ bool load_file_to_ram(const char *file_path, uint32_t ram_address) {
         }
 
         ram_ptr += bytes_read;
+        remaining -= bytes_read;
     }
 
     f_close(&file);
 
-    printf("File successfully loaded to RAM at 0x%08lX\n", ram_address);
+    printf("File successfully loaded to RAM at 0x%08lX size %d\n", ram_address, file_size);
     return true;
 }
 
