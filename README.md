@@ -35,27 +35,21 @@ A self-diagnostic menu could be displayed if there is no valid content in Bank 2
 ## How it works
 The flowchart for the application is the following :
 ```mermaid
-flowchart TD
-    A1(bootloader_main) -->|Detect SD Card| B[SD Card Found?]
-
-    B -->|No| G[Unmount FS & Deinit SD Card] --> H[Boot Bank 2]
-    B -->|Yes| C{Update Archive Exists? /retro-go_update.bin}
-
-    C -->|No| G
-    C -->|Yes| D[Load File to RAM]
-
-    D -->|Success| E[Unmount FS & Deinit SD Card]
-    E --> F[Boot RAM]
-    
-    F --> BOOT_RAM{Start Application in RAM}
-    
-    D -->|Failure| G
-
-    subgraph "Boot Bank 2"
-        H --> I{Bank2 Valid?}
-        I -->|Yes| J[Set Stack Pointer & Jump to Bank2]
-        I -->|No| K[Wait 60s, Enter Deep Sleep]
-    end
+graph TD
+    A[Start Bootloader] --> B[Detect SD Card]
+    B --> C{SD Card Found?}
+    C -->|Yes| D[Load Firmware Update File to RAM]
+    C -->|No| E[Boot Bank 2]
+    D --> F{File Loaded Successfully? /retro-go_update.bin}
+    F -->|Yes| G[Unmount SD Card and Deinit]
+    G --> H[Boot from RAM]
+    F -->|No| E
+    H --> I[Execute Firmware from RAM]
+    E --> J{Is Bank 2 Valid?}
+    J -->|Yes| K[Boot from Bank 2]
+    J -->|No| L[Wait 60 Seconds]
+    L --> M[Enter Deep Sleep]
+    K --> N[Execute Firmware from Bank 2]
 ```
 
 ## Update archive format
