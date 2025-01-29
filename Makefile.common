@@ -425,7 +425,7 @@ LDFLAGS += $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) $(CXXLIBS) -
 LDFLAGS += -Wl,--wrap=fflush
 
 # default action: build all
-all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET)_intflash.bin $(BUILD_DIR)/$(TARGET)_intflash2.bin
+all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
 
 #######################################
 # build the application
@@ -509,15 +509,9 @@ start:  # Start code located at INTFLASH_ADDRESS
 	$(GNWMANAGER) start $(INTFLASH_ADDRESS)
 .PHONY: start
 
-
-flash_intflash: $(BUILD_DIR)/$(TARGET)_intflash.bin
-	$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $< -- start $(INTFLASH_ADDRESS)
-.PHONY: flash_intflash
-
-
 # Programs both the external and internal flash.
-flash: $(BUILD_DIR)/$(TARGET)_intflash.bin
-	@$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $(BUILD_DIR)/$(TARGET)_intflash.bin \
+flash: $(BUILD_DIR)/$(TARGET).bin
+	@$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $(BUILD_DIR)/$(TARGET).bin \
 		-- start $(INTFLASH_ADDRESS) \
 		$(RESET_DBGMCU_CMD)
 .PHONY: flash
@@ -533,8 +527,8 @@ flash-monitor: flash
 # Alias for flash
 flash_all: flash
 
-size: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET)_intflash.bin 
-	$(V)printf "Internal Flash Usage (for developers): $(shell cat $(BUILD_DIR)/$(TARGET)_intflash.bin | wc -c) B\n"
+size: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin 
+	$(V)printf "Internal Flash Usage (for developers): $(shell cat $(BUILD_DIR)/$(TARGET).bin | wc -c) B\n"
 	$(V)./scripts/size.sh $<
 .PHONY: size
 
@@ -542,10 +536,10 @@ gdb: $(BUILD_DIR)/$(TARGET).elf
 	$(GDB) $< -ex "target extended-remote :3333"
 .PHONY: gdb
 
-# Flashes intflash *only* and launches gdb afterwards
-gdb_intflash: $(BUILD_DIR)/$(TARGET)_intflash.bin
+# Flashes intflash and launches gdb afterwards
+gdb_flash: $(BUILD_DIR)/$(TARGET).bin
 	$(GNWMANAGER) flash $(INTFLASH_ADDRESS) $< -- start $(INTFLASH_ADDRESS) --halt -- gdb
-.PHONY: gdb_intflash
+.PHONY: gdb_flash
 
 dump_screenshot:
 	@$(GNWMANAGER) screenshot dump
