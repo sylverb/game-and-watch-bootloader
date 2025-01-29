@@ -64,16 +64,8 @@ Two cases are handled:
 - If the file is 1MB or smaller, it is loaded into RAM, and the bootloader starts the loaded application.
 - If the file is larger than 1MB, its contents follow this structure:
 
-<svg width="700" height="100" xmlns="http://www.w3.org/2000/svg">
-  <!-- Application Binary -->
-  <rect x="0" y="10" width="300" height="50" fill="lightblue" stroke="black"/>
-  <text x="155" y="40" font-size="14" text-anchor="middle">Application Binary (1024 KB)</text>
-  <!-- Binary Length -->
-  <rect x="300" y="10" width="200" height="50" fill="lightgreen" stroke="black"/>
-  <text x="400" y="40" font-size="14" text-anchor="middle">Binary Length (4 Bytes)</text>
-  <!-- Payload -->
-  <rect x="500" y="10" width="150" height="50" fill="lightcoral" stroke="black"/>
-  <text x="575" y="40" font-size="14" text-anchor="middle">Payload (Remaining)</text>
-</svg>
+| Application Binary (1024 KB)  | Binary Length (4 Bytes) | Payload (Remaining) |
+| ----------------------------- | ----------------------- | ------------------- |
+
 
 The advantage of this format is that it combines the firmware update application and the firmware binary into a single file, simplifying the update process for users.
