@@ -25,11 +25,19 @@ Flash the binary in the internal flash of the Game & Watch using [gnwmanager](ht
 gnwmanager flash bank1 gnw_bootloader.bin -- start bank1
 ```
 
+# How to use
+A diagnostic menu is available if you keep "GAME" button pressed when turning on the Game & Watch.
+
+Available information are :
+- Bootloader version
+- SD Card status : found or not, and SD mod type (SPI1 or OSPI1)
+- Internal flash bank 2 status (valid or not)
+- External flash model and size
+
+If no button is pressed, bootloader will automatically run firmware updater or Retro-Go.
+
 # Limitations
 Currently, this bootloader is not compatible with dual boot (i.e., having both the original firmware and Retro-Go).
-
-# Possible improvements
-A self-diagnostic menu could be displayed if there is no valid content in Bank 2 or if a specific key is pressed at startup. It could show the bootloader version, SD Card status, external flash status (detected or not, size of flash/model), ...
 
 # Technical info
 ## How it works
