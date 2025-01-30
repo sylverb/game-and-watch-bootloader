@@ -2,6 +2,11 @@
 
 ## What's New
 
+### Version 1.0.1
+Added an info screen with application version and some other info that is shown if :
+- bank 2 content is incorrect
+- booting with GAME button pressed
+
 ### Version 1.0.0
 - Initial release
 
