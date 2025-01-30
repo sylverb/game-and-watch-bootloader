@@ -5,8 +5,6 @@
 
 extern bool fs_mounted;
 
-void sdcard_init(void);
-
 void sdcard_init_spi1();
 void sdcard_deinit_spi1();
 void sdcard_init_ospi1();

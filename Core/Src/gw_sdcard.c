@@ -9,7 +9,6 @@
 #include "gw_sdcard.h"
 
 bool fs_mounted = false;
-static FRESULT cause;
 
 /*************************
  * SD Card Public API *
@@ -19,34 +18,6 @@ static FRESULT cause;
  * Initialize SD card and mount the filesystem.
  */
 FATFS FatFs;  // Fatfs handle
-void sdcard_init(void) {
-    // Check if SD Card is connected to SPI1
-    sdcard_init_spi1();
-    sdcard_hw_type = SDCARD_HW_SPI1;
-    cause = f_mount(&FatFs, (const TCHAR *)"", 1);
-    if (cause == FR_OK) {
-        printf("filesytem mounted.\n");
-        fs_mounted = true;
-        return;
-    } else {
-        sdcard_deinit_spi1();
-    }
-
-    // Check if SD Card is connected over OSPI1
-    sdcard_init_ospi1();
-    sdcard_hw_type = SDCARD_HW_OSPI1;
-    cause = f_mount(&FatFs, (const TCHAR *)"", 1);
-    if (cause == FR_OK) {
-        printf("filesytem mounted.\n");
-        fs_mounted = true;
-        return;
-    } else {
-        sdcard_deinit_ospi1();
-    }
-
-    // No SD Card detected
-    sdcard_hw_type = SDCARD_HW_NO_SD_FOUND;
-}
 
 void sdcard_init_spi1() {
     // PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1 should be set
@@ -101,14 +72,14 @@ void sdcard_deinit_ospi1() {
 
 void switch_ospi_gpio(uint8_t ToOspi) {
   static uint8_t IsOspi = true;
-  static uint8_t IsFirstCall = true;
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  if ((IsOspi == ToOspi) && !IsFirstCall)
+  if (IsOspi == ToOspi)
     return;
 
   if (ToOspi) {
-    HAL_OSPI_Init(&hospi1);
+    if (HAL_OSPI_Init(&hospi1) != HAL_OK)
+      Error_Handler();
   } else {
     HAL_OSPI_DeInit(&hospi1);
 
@@ -138,6 +109,4 @@ void switch_ospi_gpio(uint8_t ToOspi) {
   }
 
   IsOspi = ToOspi;
-  IsFirstCall = false;
-
 }

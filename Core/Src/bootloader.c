@@ -29,6 +29,7 @@ void sdcard_hw_detect()
     cause = f_mount(&FatFs, (const TCHAR *)"", 1);
     if (cause == FR_OK)
     {
+        fs_mounted = true;
         return;
     }
     else
@@ -37,16 +38,19 @@ void sdcard_hw_detect()
     }
 
     // Check if SD Card is connected over OSPI1
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4,GPIO_PIN_SET); // Enable 3.3V for OSPI1
     sdcard_init_ospi1();
     sdcard_hw_type = SDCARD_HW_OSPI1;
     cause = f_mount(&FatFs, (const TCHAR *)"", 1);
     if (cause == FR_OK)
     {
+        fs_mounted = true;
         return;
     }
     else
     {
         sdcard_deinit_ospi1();
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4,GPIO_PIN_SET); // Disable 3.3V
     }
 
     // No SD Card detected
@@ -169,6 +173,7 @@ static void show_info(bool show_press_key) {
     enable_screen();
     switch_ospi_gpio(true);
     gw_gui_draw_text(10, line++ * 10, GIT_TAG, GUI_WHITE);
+    gw_gui_draw_text(10, line++ * 10, "By Sylver Bruneau (2025)", GUI_WHITE);
     line++;
     switch (sdcard_hw_type) {
         case SDCARD_HW_SPI1:

@@ -2,10 +2,8 @@
 
 ## What's New
 
-### Version 1.0.1
-Added an info screen with application version and some other info that is shown if :
-- bank 2 content is incorrect
-- booting with GAME button pressed
+### Version 1.0.2
+Fix detection problem with SD Card reader on OSPI1 (yota9 design)
 
 ## Requirements
 To install the bootloader on your Game & Watch, you need a JTAG adapter (such as an ST-Link v2).
