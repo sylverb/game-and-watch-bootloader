@@ -34,6 +34,8 @@ Available information are :
 - Internal flash bank 2 status (valid or not)
 - External flash model and size
 
+![](assets/bootloader_diag1.png) ![](assets/bootloader_diag2.png)
+
 If no button is pressed, bootloader will automatically run firmware updater or Retro-Go.
 
 # Limitations
