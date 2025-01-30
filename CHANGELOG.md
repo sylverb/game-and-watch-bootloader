@@ -7,9 +7,6 @@ Added an info screen with application version and some other info that is shown 
 - bank 2 content is incorrect
 - booting with GAME button pressed
 
-### Version 1.0.0
-- Initial release
-
 ## Requirements
 To install the bootloader on your Game & Watch, you need a JTAG adapter (such as an ST-Link v2).
 
