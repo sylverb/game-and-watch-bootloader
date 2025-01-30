@@ -2,6 +2,7 @@ build
 
 Drivers
 
+Core/Inc/gittag.h
 venv
 
 **/.DS_Store

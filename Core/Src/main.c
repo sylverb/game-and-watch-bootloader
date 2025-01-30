@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "stm32h7xx_hal.h"
 #include "gw_sdcard.h"
+#include "gw_lcd.h"
 #include "gw_linker.h"
 #include "bootloader.h"
 
@@ -138,6 +139,17 @@ void GW_EnterDeepSleep(void)
 {
   // Enable wakup by PIN1, the power button
   HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1_LOW);
+
+  lcd_backlight_off();
+
+  // Delay 500ms to give us a chance to attach a debugger in case
+  // we end up in a suspend-loop.
+  for (int i = 0; i < 10; i++) {
+      wdog_refresh();
+      HAL_Delay(50);
+  }
+  // Deinit the LCD, save power.
+  lcd_deinit(&hspi2);
 
   // Delay 500ms to give us a chance to attach a debugger in case
   // we end up in a suspend-loop.

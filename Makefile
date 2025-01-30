@@ -17,6 +17,10 @@ endif
 C_SOURCES =  \
 Core/Src/gw_sdcard.c \
 Core/Src/gw_timer.c \
+Core/Src/gw_buttons.c \
+Core/Src/gw_flash.c \
+Core/Src/gw_gui.c \
+Core/Src/gw_lcd.c \
 Core/Src/porting/gw_alloc.c \
 Core/Src/main.c \
 Core/Src/bootloader.c \

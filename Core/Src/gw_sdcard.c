@@ -101,12 +101,14 @@ void sdcard_deinit_ospi1() {
 
 void switch_ospi_gpio(uint8_t ToOspi) {
   static uint8_t IsOspi = true;
+  static uint8_t IsFirstCall = true;
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  if (IsOspi == ToOspi)
+  if ((IsOspi == ToOspi) && !IsFirstCall)
     return;
 
   if (ToOspi) {
+    HAL_OSPI_Init(&hospi1);
   } else {
     HAL_OSPI_DeInit(&hospi1);
 
@@ -136,4 +138,6 @@ void switch_ospi_gpio(uint8_t ToOspi) {
   }
 
   IsOspi = ToOspi;
+  IsFirstCall = false;
+
 }

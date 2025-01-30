@@ -24,7 +24,10 @@ typedef struct
 #define GUI_SEGMENT_INACTIVE_COLOR DARKEN(GUI_BACKGROUND_COLOR, 0.8)
 #define GUI_SEGMENT_ACTIVE_COLOR 0x0000
 
+#define GUI_GREEN RGB24_TO_RGB565(0x00, 0xFF, 0x00)
+#define GUI_RED   RGB24_TO_RGB565(0xFF, 0x00, 0x00)
+#define GUI_WHITE 0xFFFF
+
 void gw_gui_fill(pixel_t color);
 void gw_gui_draw_text(int x, int y, const char *text, pixel_t color);
 void gw_gui_draw_progress_bar(int x, int y, int width, int height, int percent, pixel_t border_color, pixel_t fill_color);
-void gw_gui_draw();

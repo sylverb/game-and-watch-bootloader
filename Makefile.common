@@ -452,6 +452,11 @@ $(eval $(foreach obj,$(SDK_C_SOURCES) $(SDK_ASM_SOURCES),$(call sdk_obj_prereq_g
 
 FORCE:
 
+Core/Inc/gittag.h: FORCE | $(BUILD_DIR)
+	$(V)./scripts/update_gittag.sh $@
+
+$(BUILD_DIR)/core/bootloader.o: Core/Inc/gittag.h
+
 $(BUILD_DIR)/%.o: %.s Makefile.common Makefile | $(BUILD_DIR)
 	$(V)$(ECHO) [ AS ] $(notdir $<)
 	$(V)$(AS) -c $(CFLAGS) $< -o $@
