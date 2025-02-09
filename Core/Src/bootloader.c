@@ -201,8 +201,8 @@ static void show_info(bool show_press_key) {
         sprintf(text, "External Flash: %s (%ldMB)", OSPI_GetFlashName(), OSPI_GetFlashSize() / (1024 * 1024));
         gw_gui_draw_text(10, line++ * 10, text, GUI_GREEN);
     } else {
-        gw_gui_draw_text(10, line++ * 10, "No external flash detected !!!", GUI_GREEN);
-        gw_gui_draw_text(10, line++ * 10, "Bad soldering ?", GUI_GREEN);
+        gw_gui_draw_text(10, line++ * 10, "No external flash detected !!!", GUI_RED);
+        gw_gui_draw_text(10, line++ * 10, "Bad soldering ?", GUI_RED);
     }
 
     line++;
