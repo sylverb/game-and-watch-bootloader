@@ -5,8 +5,12 @@ SHELL := /bin/bash
 ######################################
 # debug build?
 DEBUG ?= 1
-# optimization
-OPT ?= -Og
+
+ifeq ($(DEBUG), 1)
+OPT ?= -Og -ggdb3
+else
+OPT ?= -Os -flto
+endif
 
 SINGLE_FONT ?= 0
 

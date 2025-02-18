@@ -1,9 +1,5 @@
 TARGET = gnw_bootloader
 
-DEBUG = 0
-
-OPT = -O2 -ggdb3
-
 # To enable verbose, append VERBOSE=1 to make, e.g.:
 # make VERBOSE=1
 ifneq ($(strip $(VERBOSE)),1)
