@@ -237,7 +237,7 @@ g_pfnVectors:
   .word     SAI2_IRQHandler                   /* SAI2                         */
   .word     OCTOSPI1_IRQHandler               /* OCTOSPI1                     */
   .word     LPTIM1_IRQHandler                 /* LPTIM1                       */
-  .word     CEC_IRQHandler                    /* HDMI_CEC                     */
+  .word     0                                 /* HDMI_CEC                     */
   .word     I2C4_EV_IRQHandler                /* I2C4 Event                   */
   .word     I2C4_ER_IRQHandler                /* I2C4 Error                   */
   .word     SPDIF_RX_IRQHandler               /* SPDIF_RX                     */
