@@ -1,89 +1,77 @@
-name: Generate gw_update.tar
+name: Build Bootloader
 
 on:
+  workflow_dispatch:
   push:
+    tags:
+      - "v*.*.*"
     branches:
       - main
-    tags:
-      - 'v*'
+  pull_request:
 
 jobs:
-  build-package:
-    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repository with submodules
       - name: Checkout repository with submodules
         uses: actions/checkout@v3
         with:
           submodules: true  # Clone submodules with --recurse-submodules
 
-      # 2. Install necessary dependencies (binutils, wget, etc.)
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y binutils-arm-none-eabi wget
 
-      # 3. Install the ARM compiler
       - name: Install Arm GNU Toolchain (arm-none-eabi-gcc)
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: '13.3.Rel1'
 
-      # 4. Generate the bootloader binary
       - name: Generate gnw_bootloader.bin
         run: |
-          make -j$(nproc)
+          make clean
+          DEBUG=0 make -j$(nproc)
+          mv build/gnw_bootloader.bin gnw_bootloader.bin
 
-  release-package:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      - name: Upload gnw_bootloader.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnw_bootloader.bin
+          path: "gnw_bootloader.bin"
+
+      - name: Generate gnw_bootloader_0x08032000.bin
+        run: |
+          make clean
+          DEBUG=0 INTFLASH_ADDRESS=0x08032000 make -j$(nproc)
+          mv build/gnw_bootloader.bin gnw_bootloader_0x08032000.bin
+
+      - name: Upload gnw_bootloader_0x08032000.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnw_bootloader_0x08032000.bin
+          path: "gnw_bootloader_0x08032000.bin"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    needs:
+      - build
 
     steps:
-      # 1. Checkout the repository with submodules
-      - name: Checkout repository with submodules
-        uses: actions/checkout@v3
+      - name: Download All Binaries
+        uses: actions/download-artifact@v4
         with:
-          submodules: true  # Clone submodules with --recurse-submodules
+          path: release
+          pattern: gnw_bootloader*.bin
+          merge-multiple: true
 
-      # 2. Install necessary dependencies (binutils, wget, etc.)
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils-arm-none-eabi python3 python3-pip libhidapi-hidraw0 libftdi1 libftdi1-2 make git wget
+      - name: Display all downloaded binaries
+        run: ls -alh release/
 
-      # 3. Install the ARM compiler
-      - name: Install Arm GNU Toolchain (arm-none-eabi-gcc)
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          release: '13.3.Rel1'
-
-      # 4. Generate the update files
-      - name: Generate firmware_update.bin and gw_update.tar
-        run: |
-          make -j$(nproc)
-
-      # 5. Create a release and upload files
-      - name: Create Release
-        uses: actions/create-release@v1
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: false
-
-      # 6. Add bootloader file as assets
-      - name: Upload gnw_bootloader.bin to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: build/gnw_bootloader.bin
-          asset_name: gnw_bootloader.bin
-          asset_content_type: application/octet-stream
+          files: |
+            release/*
