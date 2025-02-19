@@ -19,11 +19,18 @@ git clone --recurse-submodules https://github.com/sylverb/game-and-watch-bootloa
 make flash
 ```
 ### By flashing released version
-Download the latest released version [here](https://github.com/sylverb/game-and-watch-bootloader/releases/)
-Flash the binary in the internal flash of the Game & Watch using [gnwmanager](https://github.com/BrianPugh/gnwmanager).
+[GnWManager](https://github.com/BrianPugh/gnwmanager) has official support for this firmware.
+The following command will download the latest version of `game-and-watch-bootloader` and flash it:
+```
+gnwmanager flash-bootloader bank1 -- start bank1
+```
+
+Alternatively, you can manually download the latest released version [here](https://github.com/sylverb/game-and-watch-bootloader/releases/).
+Flash the binary to the internal flash of the Game & Watch using [gnwmanager](https://github.com/BrianPugh/gnwmanager):
 ```
 gnwmanager flash bank1 gnw_bootloader.bin -- start bank1
 ```
+
 
 # How to use
 A diagnostic menu is available if you keep "GAME" button pressed when turning on the Game & Watch.
