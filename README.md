@@ -33,7 +33,7 @@ gnwmanager flash bank1 gnw_bootloader.bin -- start bank1
 
 
 # How to use
-A diagnostic menu is available if you keep "GAME" button pressed when turning on the Game & Watch.
+A diagnostic menu is available if you keep "PAUSE/SET" button pressed when turning on the Game & Watch.
 
 Available information are :
 - Bootloader version

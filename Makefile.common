@@ -12,24 +12,6 @@ else
 OPT ?= -Os -flto
 endif
 
-SINGLE_FONT ?= 0
-
-OFF_SAVESTATE = 0
-ifeq ($(SHARED_HIBERNATE_SAVESTATE),1)
-	OFF_SAVESTATE = 1
-endif
-
-# Disable system logos splash screen at startup
-DISABLE_SPLASH_SCREEN ?= 0
-
-# Default NES emulator is fceumm
-FORCE_NOFRENDO ?= 0 
-NOFRENDO_PARAM := --nofrendo=$(FORCE_NOFRENDO)
-
-# Default GB emulator is tgb-dual
-FORCE_GNUBOY ?= 0 
-GNUBOY_PARAM := --gnuboy=$(FORCE_GNUBOY)
-
 # Configure INTFLASH_BANK and INTFLASH_ADDRESS
 ifdef INTFLASH_ADDRESS
 INTFLASH_ADDRESS_DECIMAL = $(shell printf "%d" $(INTFLASH_ADDRESS))
@@ -344,21 +326,6 @@ C_DEFS +=  \
 -DINTFLASH_BANK=$(INTFLASH_BANK) \
 -DINTFLASH_ADDRESS=$(INTFLASH_ADDRESS) \
 -DBIG_BANK=$(BIG_BANK) \
--DOFF_SAVESTATE=$(OFF_SAVESTATE) \
--DCODEPAGE=$(CODEPAGE) \
--DUICODEPAGE=$(UICODEPAGE) \
--DINCLUDED_ES_ES=$(ES_ES) \
--DINCLUDED_PT_PT=$(PT_PT) \
--DINCLUDED_FR_FR=$(FR_FR) \
--DINCLUDED_IT_IT=$(IT_IT) \
--DINCLUDED_DE_DE=$(DE_DE) \
--DINCLUDED_RU_RU=$(RU_RU) \
--DINCLUDED_ZH_CN=$(ZH_CN) \
--DINCLUDED_ZH_TW=$(ZH_TW) \
--DINCLUDED_KO_KR=$(KO_KR) \
--DINCLUDED_JA_JP=$(JA_JP) \
--DSINGLE_FONT=$(SINGLE_FONT) \
--DLANG=$(LANG) \
 -DUSE_HAL_DRIVER \
 -DSTM32H7B0xx \
 -DIS_LITTLE_ENDIAN \
@@ -567,61 +534,20 @@ help:
 	@echo ""
 	@echo "Configuration variables:"
 	@echo "  LARGE_FLASH         - Sets the external flash size to 16MB  (deprecated)"
-	@echo "  SD_CARD             - Use SD Card reader (default=0)"
-	@echo "                        set to 1 for auto detect between SD Card reader on spi1 (Design by Tim"
-	@echo "                        Schuerewegen) or on ospi1 (Design by *yota9* Vladislav Khmelevsky)"
 	@echo "  INTFLASH_BANK       - Sets the internal flash bank. Valid values {1,2} (default=1)."
 	@echo "  INTFLASH_ADDRESS    - Explicit internal flash address. If not provided, derived from INTFLASH_BANK."
 	@echo "  BIG_BANK            - Use internal flash bank as undocumented 256k.(default=1, set 0 to 128k)."
 	@echo "  COMPRESS            - Configures ROM compression, Valid values {0,lzma} (default=lzma)."
 	@echo "  RESET_DBGMCU        - Configures if DBGMCU should be reset after flashing."
 	@echo "                        Set to 0 to disable power saving (default=1)"
-	@echo "  CODEPAGE            - Sets codepage to configures default display language.(default=1252)"
-	@echo "                        set 932 as Japanese; 936 as simple Chinese; 950 as traditional Chinese;"
-	@echo "                        949 as Korean; 12511 as Russian; 12521 as Spanish; 12522 as Portuguese;"
-	@echo "                        12523 as French; 12524 as Italian; 12525 as German;"
-	@echo "  UICODEPAGE          - Sets ui display language.(default=CODEPAGE=1252 as English)"
-	@echo "  ROMINFOCODE         - Sets encoding of parse rom name, default = ascii"
-	@echo "  ES_ES,PT_PT,FR_FR,  "
-	@echo "  IT_IT,ZH_CN,ZH_TW,  "
-	@echo "  KO_KR,JA_JP,DE_DE,  "
-	@echo "  RU_RU               - Set to 1 to include or exclude some other language"
-	@echo "  SINGLE_FONT         - Set to 1 to only include a single default font."
-	@echo "                        Saves a few dozen KB of external flash."
-	@echo "  ENABLE_SCREENSHOT   - Set to 1 to enable screenshot support (default enabled)"
-	@echo "  GAME_GENIE          - Set to 1 to enable game genie support (deprecated, use CHEAT_CODES instead)"
-	@echo "  CHEAT_CODES         - Set to 1 to enable cheat codes support (default=0)"
-	@echo "  MSX_USE_BANK_2      - Set to 1 to use Internal Bank 2 for MSX performance improvements."
-	@echo "                        Retro-Go must be in Bank 1."
-	@echo "  SHARED_HIBERNATE_SAVESTATE - Set to 1 to enable a separate savestate for off/on (default=0)"
-	@echo "  DISABLE_SPLASH_SCREEN - Set to 1 to disable the slash screen animation at startup (default=0)"
-	@echo "  FORCE_NOFRENDO      - Set to 1 to force use of previous nofrendo-go emulator instead of fceumm (default=0)"
-	@echo "  FORCE_GNUBOY        - Set to 1 to force use of previous gnuboy emulator instead of tgb-dual (default=0)"
 	@echo ""
 	@echo "Current configuration:"
 	@echo "  INTFLASH_BANK=$(INTFLASH_BANK)"
 	@echo "  BIG_BANK=$(BIG_BANK)"
 	@echo "  COMPRESS=$(COMPRESS)"
 	@echo "  RESET_DBGMCU=$(RESET_DBGMCU)"
-	@echo "  ENABLE_SCREENSHOT=$(ENABLE_SCREENSHOT)"
-	@echo "  CHEAT_CODES=$(CHEAT_CODES)"
-	@echo "  MSX_USE_BANK_2=$(MSX_USE_BANK_2)"
 	@echo "  GCC_PATH=$(GCC_PATH)"
 	@echo "  PREFIX=$(PREFIX)"
-	@echo "  CODEPAGE=$(CODEPAGE)"
-	@echo "  UICODEPAGE=$(UICODEPAGE)"
-	@echo "  ROMINFOCODE=$(ROMINFOCODE)"
-	@echo "  SHARED_HIBERNATE_SAVESTATE=$(SHARED_HIBERNATE_SAVESTATE)"
-	@echo "  ES_ES=$(ES_ES)"
-	@echo "  PT_PT=$(PT_PT)"
-	@echo "  FR_FR=$(FR_FR)"
-	@echo "  IT_IT=$(IT_IT)"
-	@echo "  RU_RU=$(RU_RU)"
-	@echo "  DE_DE=$(DE_DE)"
-	@echo "  ZH_CN=$(ZH_CN)"
-	@echo "  ZH_TW=$(ZH_TW)"
-	@echo "  KO_KR=$(KO_KR)"
-	@echo "  JA_JP=$(JA_JP)"
 	@echo ""
 	@echo "Targets:"
 	@echo "  docker            - Runs a docker container using the image created by docker_build"

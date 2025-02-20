@@ -254,14 +254,14 @@ void bootloader_main(void)
     sdcard_hw_detect();
 
     uint32_t boot_buttons = buttons_get();
-    if (boot_buttons & B_GAME)
+    if (boot_buttons & B_PAUSE)
     {
         show_info(true);
         while(1) {
             boot_buttons = buttons_get();
             if (boot_buttons & B_POWER) {
                 GW_EnterDeepSleep();
-            } else if (boot_buttons & ~B_GAME) {
+            } else if (boot_buttons & ~B_PAUSE) {
                 break;
             }
         }
