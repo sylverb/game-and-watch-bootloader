@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout repository with submodules
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true  # Clone submodules with --recurse-submodules
 
@@ -60,6 +60,12 @@ jobs:
       - build
 
     steps:
+      # Reclone repository to get CHANGELOG.md
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
       - name: Download All Binaries
         uses: actions/download-artifact@v4
         with:
