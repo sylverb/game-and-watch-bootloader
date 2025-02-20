@@ -2,8 +2,8 @@
 
 ## What's New
 
-### Version 1.0.2
-Fix detection problem with SD Card reader on OSPI1 (yota9 design)
+### Version 1.0.3
+- Update for dual boot (patched OFW) support
 
 ## Requirements
 To install the bootloader on your Game & Watch, you need a JTAG adapter (such as an ST-Link v2).
