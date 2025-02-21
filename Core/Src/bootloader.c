@@ -207,7 +207,7 @@ static void show_info(bool show_press_key) {
 
     line++;
     if (show_press_key) {
-        gw_gui_draw_text(10, line++ * 10, "Press any key to continue", GUI_WHITE);
+        gw_gui_draw_text(10, line++ * 10, "Press A/B button to continue", GUI_WHITE);
     } else {
         gw_gui_draw_text(10, line++ * 10, "Failed to boot bank2", GUI_RED);
         line++;
@@ -257,11 +257,11 @@ void bootloader_main(void)
     if (boot_buttons & B_PAUSE)
     {
         show_info(true);
-        while(1) {
+        while (1) {
             boot_buttons = buttons_get();
             if (boot_buttons & B_POWER) {
                 GW_EnterDeepSleep();
-            } else if (boot_buttons & ~B_PAUSE) {
+            } else if (boot_buttons & (B_A | B_B)) {
                 break;
             }
         }
@@ -306,7 +306,7 @@ void bootloader_main(void)
     // If bank 2 is not valid, show info screen
     if ((pc < FLASH_BANK2_BASE) || (pc >= FLASH_BANK2_BASE + 256*1024)) {
         show_info(false);
-        while(1) {
+        while (1) {
             boot_buttons = buttons_get();
             if (boot_buttons & B_POWER) {
                 GW_EnterDeepSleep();

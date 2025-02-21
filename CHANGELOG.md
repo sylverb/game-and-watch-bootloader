@@ -2,9 +2,8 @@
 
 ## What's New
 
-### Version 1.0.3
-- Update for dual boot (patched OFW) support
-- Change diagnostic key to PAUSE/SET to prevent unwanted activation with dual boot keys ("GAME + Left")
+### Version 1.0.4
+- Change keys to exit diagnostic menu to A/B to prevent exiting menu because of "Game + Left" dual boot keys
 
 ## Requirements
 To install the bootloader on your Game & Watch, you need a JTAG adapter (such as an ST-Link v2).
