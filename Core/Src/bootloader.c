@@ -228,6 +228,25 @@ void boot_bank2(void)
     start_app((void (*const)(void))pc, (uint32_t)sp);
 }
 
+void boot_bank2_checked(void) {
+    uint32_t pc = *((uint32_t *)FLASH_BANK2_BASE + 1);
+
+    // If bank 2 is not valid, show info screen
+    if ((pc < FLASH_BANK2_BASE) || (pc >= FLASH_BANK2_BASE + 256*1024)) {
+        show_info(false);
+        while (1) {
+            uint32_t buttons = buttons_get();
+            if (buttons & B_POWER) {
+                GW_EnterDeepSleep();
+            }
+        }
+    }
+
+    while (1) {
+        boot_bank2();
+    }
+}
+
 void set_vtor(uint32_t address) {
     SCB->VTOR = address;
     __DSB();
@@ -247,14 +266,21 @@ void boot_ram(void)
 
 void bootloader_main(void)
 {
-    uint32_t pc = *((uint32_t *)FLASH_BANK2_BASE + 1);
-
     printf("bootloader_main()\n");
+
+    uint32_t boot_buttons = buttons_get();
+
+    // Boot directly if Time+Pause are held
+    if ((boot_buttons & (B_TIME | B_PAUSE)) == (B_TIME | B_PAUSE))
+    {
+        boot_bank2_checked();
+        return;
+    }
 
     sdcard_hw_detect();
 
-    uint32_t boot_buttons = buttons_get();
-    if (boot_buttons & B_PAUSE)
+    // Show info if only Pause is held
+    if ((boot_buttons & (B_TIME | B_PAUSE)) == B_PAUSE)
     {
         show_info(true);
         while (1) {
@@ -303,17 +329,5 @@ void bootloader_main(void)
         break;
     }
 
-    // If bank 2 is not valid, show info screen
-    if ((pc < FLASH_BANK2_BASE) || (pc >= FLASH_BANK2_BASE + 256*1024)) {
-        show_info(false);
-        while (1) {
-            boot_buttons = buttons_get();
-            if (boot_buttons & B_POWER) {
-                GW_EnterDeepSleep();
-            }
-        }
-    }
-    while (1) {
-        boot_bank2();
-    }
+    boot_bank2_checked();
 }
