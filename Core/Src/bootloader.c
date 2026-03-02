@@ -173,7 +173,7 @@ static void show_info(bool show_press_key) {
     enable_screen();
     switch_ospi_gpio(true);
     gw_gui_draw_text(10, line++ * 10, GIT_TAG, GUI_WHITE);
-    gw_gui_draw_text(10, line++ * 10, "By Sylver Bruneau (2025)", GUI_WHITE);
+    gw_gui_draw_text(10, line++ * 10, "By Sylver Bruneau (2025-2026)", GUI_WHITE);
     line++;
     switch (sdcard_hw_type) {
         case SDCARD_HW_SPI1:
