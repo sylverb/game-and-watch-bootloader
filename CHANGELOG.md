@@ -4,7 +4,6 @@
 
 ### Version 1.0.7
 Some minor SD Card improvements fixes :
-- Checksum of read data blocks is now checked
 - Protection against some possible infinite loops
 - Better shut down code for SD Card
 
