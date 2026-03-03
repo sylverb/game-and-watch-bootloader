@@ -2,8 +2,10 @@
 
 ## What's New
 
-### Version 1.0.4
-- Change keys to exit diagnostic menu to A/B to prevent exiting menu because of "Game + Left" dual boot keys
+### Version 1.0.7
+Some minor SD Card improvements fixes :
+- Protection against some possible infinite loops
+- Better shut down code for SD Card
 
 ## Requirements
 To install the bootloader on your Game & Watch, you need a JTAG adapter (such as an ST-Link v2).

@@ -45,9 +45,6 @@ Available information are :
 
 If no button is pressed, bootloader will automatically run firmware updater or Retro-Go.
 
-# Limitations
-Currently, this bootloader is not compatible with dual boot (i.e., having both the original firmware and Retro-Go).
-
 # Technical info
 ## How it works
 The flowchart for the application is the following :
