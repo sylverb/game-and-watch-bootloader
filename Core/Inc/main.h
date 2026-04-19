@@ -51,10 +51,12 @@ typedef enum {
 } BSOD_t;
 
 typedef enum {
-    SDCARD_HW_UNDETECTED,  // No detection done
-    SDCARD_HW_NO_SD_FOUND, // No SD detected
-    SDCARD_HW_SPI1,        // Tim Schuerewegen design (SPI1)
-    SDCARD_HW_OSPI1,       // Yota9 design (soft SPI over OSPI)
+    SDCARD_HW_UNDETECTED,           // No detection done
+    SDCARD_HW_NO_SD_FOUND,          // No SD detected (no response on either bus)
+    SDCARD_HW_SPI1,                 // Tim Schuerewegen design (SPI1), FAT/exFAT mounted
+    SDCARD_HW_OSPI1,                // Yota9 design (soft SPI over OSPI), FAT/exFAT mounted
+    SDCARD_HW_SPI1_UNSUPPORTED_FS,  // Card responds on SPI1 but volume is not FAT/exFAT
+    SDCARD_HW_OSPI1_UNSUPPORTED_FS,  // Card responds on OSPI1 but volume is not FAT/exFAT
 } sdcard_hw_type_t;
 
 extern sdcard_hw_type_t sdcard_hw_type;

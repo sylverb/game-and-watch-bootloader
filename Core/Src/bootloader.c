@@ -9,9 +9,12 @@
 #include "main.h"
 #include "gittag.h"
 #include "ff.h"
+#include "diskio.h"
 #include "bootloader.h"
 
 #define FIRMWARE_UPDATE_FILE "/retro-go_update.bin"
+/* Physical drive number used by FatFs for the default volume (logical drive 0) */
+#define SD_PDRV 0
 #define RAM_START D1_AXISRAM_BASE /* 0x24000000 */
 #define MAX_FILE_SIZE (1024 * 1024) /* 1MB of SRAM */
 
@@ -22,38 +25,48 @@ static FATFS FatFs; // Fatfs handle
 void sdcard_hw_detect()
 {
     FRESULT cause;
+    DSTATUS disk_status;
 
-    // Check if SD Card is connected to SPI1
+    // Check if SD Card is connected to SPI1: detect by SD commands first, then mount FS
     sdcard_init_spi1();
     sdcard_hw_type = SDCARD_HW_SPI1;
-    cause = f_mount(&FatFs, (const TCHAR *)"", 1);
-    if (cause == FR_OK)
+    disk_status = disk_initialize(SD_PDRV);
+    if (disk_status == 0)
     {
-        fs_mounted = true;
+        cause = f_mount(&FatFs, (const TCHAR *)"", 1);
+        if (cause == FR_OK)
+        {
+            fs_mounted = true;
+            return;
+        }
+        /* Card responds but no FAT/exFAT volume FatFs can mount (e.g. NTFS, ext4). */
+        fs_mounted = false;
+        sdcard_hw_type = SDCARD_HW_SPI1_UNSUPPORTED_FS;
         return;
     }
-    else
-    {
-        sdcard_deinit_spi1();
-    }
+    sdcard_deinit_spi1();
 
     // Check if SD Card is connected over OSPI1
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4,GPIO_PIN_SET); // Enable 3.3V for OSPI1
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); // Enable 3.3V for OSPI1
     sdcard_init_ospi1();
     sdcard_hw_type = SDCARD_HW_OSPI1;
-    cause = f_mount(&FatFs, (const TCHAR *)"", 1);
-    if (cause == FR_OK)
+    disk_status = disk_initialize(SD_PDRV);
+    if (disk_status == 0)
     {
-        fs_mounted = true;
+        cause = f_mount(&FatFs, (const TCHAR *)"", 1);
+        if (cause == FR_OK)
+        {
+            fs_mounted = true;
+            return;
+        }
+        fs_mounted = false;
+        sdcard_hw_type = SDCARD_HW_OSPI1_UNSUPPORTED_FS;
         return;
     }
-    else
-    {
-        sdcard_deinit_ospi1();
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4,GPIO_PIN_SET); // Disable 3.3V
-    }
+    sdcard_deinit_ospi1();
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET); // Disable 3.3V
 
-    // No SD Card detected
+    // No SD Card detected (no response to SD commands on either interface)
     sdcard_hw_type = SDCARD_HW_NO_SD_FOUND;
 }
 
@@ -170,24 +183,88 @@ static void show_info(bool show_press_key) {
     char text[50];
     uint32_t sp = *((uint32_t *)FLASH_BANK2_BASE);
     uint32_t pc = *((uint32_t *)FLASH_BANK2_BASE + 1);
+    DWORD sector_count = 0;
+    const char *fs_type_str = "Unknown";
+    unsigned long size_gb = 0;
     enable_screen();
     switch_ospi_gpio(true);
     gw_gui_draw_text(10, line++ * 10, GIT_TAG, GUI_WHITE);
     gw_gui_draw_text(10, line++ * 10, "By Sylver Bruneau (2025-2026)", GUI_WHITE);
     line++;
+    /* Line 1: hardware detection; line 2: filesystem / volume */
     switch (sdcard_hw_type) {
-        case SDCARD_HW_SPI1:
-            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_GREEN);
-            gw_gui_draw_text(170, line++ * 10, "OK (SPI1)", GUI_GREEN);
-        break;
-        case SDCARD_HW_OSPI1:
-            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_GREEN);
-            gw_gui_draw_text(170, line++ * 10, "OK (OSPI1)", GUI_GREEN);
-        break;
-        default:
+        case SDCARD_HW_NO_SD_FOUND:
             gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_RED);
             gw_gui_draw_text(170, line++ * 10, "No SD Card found", GUI_RED);
-        break;
+            gw_gui_draw_text(10, line++ * 10, "FS : -", GUI_WHITE);
+            break;
+        case SDCARD_HW_SPI1_UNSUPPORTED_FS:
+            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_GREEN);
+            gw_gui_draw_text(170, line++ * 10, "OK (SPI1)", GUI_GREEN);
+            gw_gui_draw_text(10, line++ * 10, "FS : not FAT/exFAT", GUI_RED);
+            break;
+        case SDCARD_HW_OSPI1_UNSUPPORTED_FS:
+            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_GREEN);
+            gw_gui_draw_text(170, line++ * 10, "OK (OSPI1)", GUI_GREEN);
+            gw_gui_draw_text(10, line++ * 10, "FS : not FAT/exFAT", GUI_RED);
+            break;
+        case SDCARD_HW_SPI1:
+        case SDCARD_HW_OSPI1: {
+            FATFS *pfs = &FatFs;
+
+            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_GREEN);
+            if (sdcard_hw_type == SDCARD_HW_SPI1) {
+                gw_gui_draw_text(170, line++ * 10, "OK (SPI1)", GUI_GREEN);
+            } else {
+                gw_gui_draw_text(170, line++ * 10, "OK (OSPI1)", GUI_GREEN);
+            }
+
+            if (fs_mounted) {
+                if (pfs->n_fatent > 2 && pfs->csize != 0) {
+                    unsigned long long total_sectors =
+                        (unsigned long long)(pfs->n_fatent - 2) * (unsigned long long)pfs->csize;
+                    if (total_sectors <= 0xFFFFFFFFUL)
+                        sector_count = (DWORD)total_sectors;
+                    else
+                        sector_count = 0xFFFFFFFFUL;
+                }
+
+                switch (pfs->fs_type) {
+                    case FS_EXFAT:
+                        fs_type_str = "exFAT";
+                        break;
+                    case FS_FAT12:
+                        fs_type_str = "FAT12";
+                        break;
+                    case FS_FAT16:
+                        fs_type_str = "FAT16";
+                        break;
+                    case FS_FAT32:
+                        fs_type_str = "FAT32";
+                        break;
+                    default:
+                        fs_type_str = "?";
+                        break;
+                }
+
+                if (sector_count != 0) {
+                    unsigned long long bytes = (unsigned long long)sector_count * 512ULL;
+                    size_gb = (unsigned long)(bytes / 1000000000ULL);
+                    sprintf(text, "FS : %lu GB %s", size_gb, fs_type_str);
+                    gw_gui_draw_text(10, line++ * 10, text, GUI_GREEN);
+                } else {
+                    gw_gui_draw_text(10, line++ * 10, "FS : ?", GUI_WHITE);
+                }
+            } else {
+                gw_gui_draw_text(10, line++ * 10, "FS : ?", GUI_WHITE);
+            }
+            break;
+        }
+        default:
+            gw_gui_draw_text(10, line * 10, "SD Card detection :", GUI_RED);
+            gw_gui_draw_text(170, line++ * 10, "Unknown", GUI_RED);
+            gw_gui_draw_text(10, line++ * 10, "FS : -", GUI_WHITE);
+            break;
     }
     sprintf(text, "Bank 2 PC: 0x%08lX SP: 0x%08lX", pc, sp);
     if ((pc > FLASH_BANK2_BASE) && (pc < FLASH_BANK2_BASE + 256*1024)) {
@@ -270,7 +347,7 @@ void bootloader_main(void)
     if (sdcard_hw_type == SDCARD_HW_NO_SD_FOUND)
     {
         printf("No SD Card found\n");
-    } else {
+    } else if (fs_mounted) {
         if (load_file_to_ram(FIRMWARE_UPDATE_FILE, RAM_START)) {
             // Unmount Fs and Deinit SD Card
             f_unmount("");
@@ -286,6 +363,9 @@ void bootloader_main(void)
             }
             boot_ram();
         }
+    } else if (sdcard_hw_type == SDCARD_HW_SPI1_UNSUPPORTED_FS ||
+               sdcard_hw_type == SDCARD_HW_OSPI1_UNSUPPORTED_FS) {
+        printf("SD card present but filesystem not supported (FAT/exFAT only)\n");
     }
 
     // Unmount Fs and Deinit SD Card if needed
@@ -294,9 +374,11 @@ void bootloader_main(void)
     }
     switch (sdcard_hw_type) {
         case SDCARD_HW_SPI1:
+        case SDCARD_HW_SPI1_UNSUPPORTED_FS:
             sdcard_deinit_spi1();
         break;
         case SDCARD_HW_OSPI1:
+        case SDCARD_HW_OSPI1_UNSUPPORTED_FS:
             sdcard_deinit_ospi1();
         break;
         default:

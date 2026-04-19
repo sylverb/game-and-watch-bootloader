@@ -164,9 +164,11 @@ void GW_EnterDeepSleep(void)
   }
   switch (sdcard_hw_type) {
     case SDCARD_HW_SPI1:
+    case SDCARD_HW_SPI1_UNSUPPORTED_FS:
       sdcard_deinit_spi1();
       break;
     case SDCARD_HW_OSPI1:
+    case SDCARD_HW_OSPI1_UNSUPPORTED_FS:
       sdcard_deinit_ospi1();
       break;
     default:
