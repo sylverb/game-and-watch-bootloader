@@ -32,6 +32,7 @@ Core/Src/porting/lib/FatFs/user_diskio.c \
 Core/Src/porting/lib/FatFs/ff.c \
 Core/Src/porting/lib/FatFs/ffsystem.c \
 Core/Src/porting/lib/FatFs/ffunicode.c \
+Core/Src/porting/lib/FatFs/sd_crc.c \
 Core/Src/porting/lib/FatFs/user_diskio_spi.c \
 Core/Src/porting/lib/FatFs/user_diskio_softspi.c
 
