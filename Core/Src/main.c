@@ -211,9 +211,13 @@ int main(void)
     __NOP();
   }
 
-  // Reset the log write pointer
-  logbuf[0] = '\0';
-  log_idx = 0;
+  // Reset the log write pointer — but keep it across a watchdog reset so bank2
+  // can still show the pre-reset log on the BSOD. Never touch boot_magic here:
+  // retro-go (bank2) reads it to decide whether to show the watchdog BSOD.
+  if (boot_magic != BOOT_MAGIC_WATCHDOG) {
+    logbuf[0] = '\0';
+    log_idx = 0;
+  }
 
   printf("main()\n");
   /* USER CODE END 1 */

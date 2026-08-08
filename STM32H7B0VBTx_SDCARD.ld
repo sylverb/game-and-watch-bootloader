@@ -172,11 +172,17 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >FLASH
 
-  /* Force some variables at fixed locations for easy OCD interactions without needing ELF file */
+  /* Force some variables at fixed locations for easy OCD interactions without needing ELF file.
+   * Layout MUST match retro-go (bank2): boot_magic, log_idx, logbuf at the start of DTCM.
+   * If boot_magic is omitted here it becomes an orphan at 0x0 and log_idx lands at
+   * 0x20000000 — which is where retro-go stores boot_magic. The bootloader then does
+   * `log_idx = 0` and silently erases BOOT_MAGIC_WATCHDOG before jumping to bank2,
+   * so the watchdog BSOD never appears. */
   ._persistent (NOLOAD) :
   {
     . = ALIGN(4);
     __dtcram_start__ = .;
+    *(.persistent_boot_magic)
     *(.persistent_log_idx)
     *(.persistent_logbuf)
     . = ALIGN(4);

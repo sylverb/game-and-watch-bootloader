@@ -83,6 +83,10 @@ extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 extern TIM_HandleTypeDef htim1;
 
+/* Must match retro-go Core/Inc/main.h — shared via DTCM ._persistent */
+#define BOOT_MAGIC_WATCHDOG 0xd066cafe
+extern volatile uint32_t boot_magic;
+
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
