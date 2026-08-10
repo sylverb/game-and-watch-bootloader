@@ -207,9 +207,11 @@ void wdog_refresh()
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+#if false
   for(int i = 0; i < 1000000; i++) {
     __NOP();
   }
+#endif
 
   // Reset the log write pointer — but keep it across a watchdog reset so bank2
   // can still show the pre-reset log on the BSOD. Never touch boot_magic here:
